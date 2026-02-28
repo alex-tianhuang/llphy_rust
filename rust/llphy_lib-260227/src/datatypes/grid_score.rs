@@ -1,29 +1,29 @@
-use std::{array, cmp};
-
+use crate::{
+    datatypes::{AAMap, Aminoacid, aa_canonical_str},
+    leak_vec,
+};
 use bumpalo::{Bump, collections::Vec};
-
-use crate::{datatypes::{AAIndex, AAMap, Aminoacid, aa_canonical_str}, leak_vec};
-
+use std::{array, cmp};
 const MIN_XMER: usize = 1;
-pub struct GridScoreOld {
-
-}
+pub struct GridScoreOld {}
 pub struct ResidueDataOld {
-    ires: usize,
     aa: Aminoacid,
     // n_outside_grid: usize,
     sr: f64,
-    lr: f64
+    lr: f64,
 }
-pub type ResScoresOld<'a> = AAMap<&'a[ResScoresEntryOld]>;
+pub type ResScoresOld<'a> = AAMap<&'a [ResScoresEntryOld]>;
 #[derive(Clone)]
 pub struct ResScoresEntryOld {
-    pub ires: usize,
     pub sr: f64,
-    pub lr: f64
+    pub lr: f64,
 }
 impl GridScoreOld {
-    pub fn score_sequence_to_res_scores<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> ResScoresOld<'a> {
+    pub fn score_sequence_to_res_scores<'a>(
+        &self,
+        sequence: &aa_canonical_str,
+        arena: &'a Bump,
+    ) -> ResScoresOld<'a> {
         let mut residue_counts = AAMap([0_usize; 20]);
         for aa in sequence {
             residue_counts[aa] += 1;
@@ -32,8 +32,8 @@ impl GridScoreOld {
             let cap_bound = residue_counts.0[aaindex];
             Vec::with_capacity_in(cap_bound, arena)
         }));
-        for ResidueDataOld { ires, aa, sr, lr } in self.score_sequence(sequence) {
-            grid[aa].push(ResScoresEntryOld { ires, sr, lr })
+        for ResidueDataOld { aa, sr, lr } in self.score_sequence(sequence) {
+            grid[aa].push(ResScoresEntryOld { sr, lr })
         }
         AAMap(grid.0.map(|buf| leak_vec(buf) as &[_]))
     }
@@ -63,11 +63,12 @@ impl GridScoreOld {
                 // avg_zscore_lr += zscore_lr;
                 // zscore_n += 1.0;
                 let [total_slot, sr_slot, lr_slot] = &mut grid_counts;
-                let (total, sr, lr) = self.query_zgrid_db_exact(mid_res, xmer, sr_key, lr_key)
-                .unwrap_or_else(|| {
-                    // n_outside_grid += 1;
-                    self.query_zgrid_db_nearest(mid_res, xmer, sr_key, lr_key)
-                });
+                let (total, sr, lr) = self
+                    .query_zgrid_db_exact(mid_res, xmer, sr_key, lr_key)
+                    .unwrap_or_else(|| {
+                        // n_outside_grid += 1;
+                        self.query_zgrid_db_nearest(mid_res, xmer, sr_key, lr_key)
+                    });
                 *total_slot += total;
                 *sr_slot += sr;
                 *lr_slot += lr;
@@ -82,16 +83,19 @@ impl GridScoreOld {
                 // avg_zscore_lr /= zscore_n;
             }
             score_data.push(ResidueDataOld {
-                ires: i + 1,
                 aa: mid_res,
                 // n_outside_grid,
                 sr: freq_by_grid_sr,
-                lr: freq_by_grid_lr
+                lr: freq_by_grid_lr,
             });
         }
         score_data
     }
-    fn get_middle_seq_centered_at<'a>(&self, sequence: &'a aa_canonical_str, center: usize) -> &'a aa_canonical_str {
+    fn get_middle_seq_centered_at<'a>(
+        &self,
+        sequence: &'a aa_canonical_str,
+        center: usize,
+    ) -> &'a aa_canonical_str {
         let space_on_left = center;
         let space_on_right = sequence.len() - 1 - center;
         let min_space = cmp::min(space_on_left, space_on_right);
@@ -114,15 +118,19 @@ impl GridScoreOld {
         let mut scores = std::vec::Vec::with_capacity(cap);
         for p in 0..midpoint {
             let c_term_position = midpoint + 1 + p;
-            let (freq_a, std_a) = self.query_freq_pair_db::<true, true>(mid_res_aa, m_seq[c_term_position], p);
-            let (freq_b, std_b) = self.query_freq_pair_db::<true, false>(mid_res_aa, m_seq[c_term_position], p); 
+            let (freq_a, std_a) =
+                self.query_freq_pair_db::<true, true>(mid_res_aa, m_seq[c_term_position], p);
+            let (freq_b, std_b) =
+                self.query_freq_pair_db::<true, false>(mid_res_aa, m_seq[c_term_position], p);
             frequency_sum_a += freq_a / std_a;
             frequency_sum_b += freq_b / std_b;
             denom_total_a += 1.0 / std_a;
             denom_total_b += 1.0 / std_b;
             let n_term_position = midpoint - 1 - p;
-            let (freq_a, std_a) = self.query_freq_pair_db::<false, true>(m_seq[n_term_position], mid_res_aa, p);
-            let (freq_b, std_b) = self.query_freq_pair_db::<false, false>(m_seq[n_term_position], mid_res_aa, p); 
+            let (freq_a, std_a) =
+                self.query_freq_pair_db::<false, true>(m_seq[n_term_position], mid_res_aa, p);
+            let (freq_b, std_b) =
+                self.query_freq_pair_db::<false, false>(m_seq[n_term_position], mid_res_aa, p);
             frequency_sum_a += freq_a / std_a;
             frequency_sum_b += freq_b / std_b;
             denom_total_a += 1.0 / std_a;
@@ -135,16 +143,33 @@ impl GridScoreOld {
         }
         scores
     }
-    fn query_freq_pair_db<const X: bool, const TAG_A: bool>(&self, aa_a: Aminoacid, aa_b: Aminoacid, distance: usize) -> (f64, f64) {
+    fn query_freq_pair_db<const X: bool, const TAG_A: bool>(
+        &self,
+        aa_a: Aminoacid,
+        aa_b: Aminoacid,
+        distance: usize,
+    ) -> (f64, f64) {
         todo!()
     }
     fn query_avg_sdev_db<const SR: bool>(&self, mid_res: Aminoacid, xmer: usize) -> (f64, f64) {
         todo!()
     }
-    fn query_zgrid_db_exact(&self, mid_res: Aminoacid, xmer: usize, sr_linekey: f64, lr_linekey: f64) -> Option<(f64, f64, f64)> {
+    fn query_zgrid_db_exact(
+        &self,
+        mid_res: Aminoacid,
+        xmer: usize,
+        sr_linekey: f64,
+        lr_linekey: f64,
+    ) -> Option<(f64, f64, f64)> {
         todo!()
     }
-    fn query_zgrid_db_nearest(&self, mid_res: Aminoacid, xmer: usize, sr_linekey: f64, lr_linekey: f64) -> (f64, f64, f64) {
+    fn query_zgrid_db_nearest(
+        &self,
+        mid_res: Aminoacid,
+        xmer: usize,
+        sr_linekey: f64,
+        lr_linekey: f64,
+    ) -> (f64, f64, f64) {
         todo!()
     }
 }
