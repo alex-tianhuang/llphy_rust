@@ -4,20 +4,15 @@ mod aamap;
 mod aaset;
 mod aastring;
 mod aminoacid;
-pub(crate) use aamap::const_aamap;
-pub use aamap::{AAMap, 
-    // AAWeights
+pub use aamap::{
+    AAMap,
 };
-pub use aaset::AASet;
-pub(crate) use aastring::{
-    AACanonicalString, AACanonicalStringStrict, NotCanonicalAAStrError, aa_canonical_str,
-    generic,
-};
+pub(crate) use aastring::aa_canonical_str;
 pub(crate) use aminoacid::{AAIndex, AMINOACIDS, Aminoacid, NotAminoacidError};
 
 /// Fasta entry, containing a sequence and header.
 #[derive(Clone, Copy)]
 pub struct FastaEntry<'a> {
     pub header: &'a str,
-    pub sequence: &'a aa_canonical_str
+    pub sequence: &'a aa_canonical_str,
 }
