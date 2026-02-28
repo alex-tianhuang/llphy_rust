@@ -23,7 +23,7 @@ pub struct ResScoresEntryOld {
     lr: f64
 }
 impl GridScoreOld {
-    pub fn score_sequence_to_grid<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> ResScoresOld<'a> {
+    pub fn score_sequence_to_res_scores<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> ResScoresOld<'a> {
         let mut residue_counts = AAMap([0_usize; 20]);
         for aa in sequence {
             residue_counts[aa] += 1;
