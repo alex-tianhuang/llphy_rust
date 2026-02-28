@@ -38,7 +38,7 @@ pub fn read_fasta(path: PathBuf, arena: &Bump) -> Result<Vec<'_, FastaEntry<'_>>
 }
 /// Read the file at `path` into the given memory arena
 /// as a vector of bytes.
-pub fn read_file<'a, 'b>(path: &'a Path, arena: &'b Bump) -> Result<Vec<'b, u8>, Error> {
+pub fn read_file<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, u8>, Error> {
     let mut file = File::open(path)?;
     // Truncation made by casting does not matter.
     // If the filesize is greater than `usize::MAX`
