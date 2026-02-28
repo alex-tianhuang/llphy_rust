@@ -16,6 +16,7 @@ pub(crate) use aastring::{
 pub(crate) use aminoacid::{AAIndex, AMINOACIDS, Aminoacid, NotAminoacidError};
 
 /// Fasta entry, containing a sequence and header.
+#[derive(Clone, Copy)]
 pub struct FastaEntry<'a> {
     pub header: &'a str,
     pub sequence: &'a aa_canonical_str
