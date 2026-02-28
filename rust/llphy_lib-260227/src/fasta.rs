@@ -1,7 +1,6 @@
 //! Module defining [`parse_fasta_entries`].
-use crate::datatypes::{Aminoacid, FastaEntry, aa_canonical_str};
+use crate::{datatypes::{Aminoacid, FastaEntry, aa_canonical_str}, leak_vec};
 use bumpalo::{Bump, collections::Vec};
-use std::mem::{self, ManuallyDrop};
 
 /// Parse a buffer with FASTA-formatted sequences
 /// into a vector of [`FastaEntry`] structs.
@@ -172,13 +171,4 @@ fn parse_sequence(slice: &mut [u8]) -> ParseResult<'_> {
 /// Right now I ignore whitespace characters.
 fn should_warn(b: u8) -> bool {
     !b.is_ascii_whitespace()
-}
-/// Leak a [`Vec`] managed by an arena into a slice
-/// that lives for as long as the arena does not reset.
-pub fn leak_vec<'a, T>(buf: Vec<'a, T>) -> &'a mut [T] {
-    let mut buf = ManuallyDrop::new(buf);
-    // SAFETY: the arena must de-allocate before this vec does.
-    //         Also, do to the use of `ManuallyDrop`, these bytes
-    //         are not de-allocated and reused by the arena.
-    unsafe { mem::transmute::<&mut [T], &'a mut [T]>(buf.as_mut_slice()) }
 }
