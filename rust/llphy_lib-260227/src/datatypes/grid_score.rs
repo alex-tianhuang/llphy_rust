@@ -2,7 +2,7 @@ use std::{array, cmp};
 
 use bumpalo::{Bump, collections::Vec};
 
-use crate::datatypes::{AAIndex, AAMap, Aminoacid, aa_canonical_str};
+use crate::{datatypes::{AAIndex, AAMap, Aminoacid, aa_canonical_str}, leak_vec};
 
 const MIN_XMER: usize = 1;
 pub struct GridScoreOld {
@@ -15,12 +15,12 @@ pub struct ResidueDataOld {
     sr: f64,
     lr: f64
 }
-pub type ResScoresOld<'a> = AAMap<Vec<'a, ResScoresEntryOld>>;
+pub type ResScoresOld<'a> = AAMap<&'a[ResScoresEntryOld]>;
 #[derive(Clone)]
 pub struct ResScoresEntryOld {
-    ires: usize,
-    sr: f64,
-    lr: f64
+    pub ires: usize,
+    pub sr: f64,
+    pub lr: f64
 }
 impl GridScoreOld {
     pub fn score_sequence_to_res_scores<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> ResScoresOld<'a> {
@@ -35,7 +35,7 @@ impl GridScoreOld {
         for ResidueDataOld { ires, aa, sr, lr } in self.score_sequence(sequence) {
             grid[aa].push(ResScoresEntryOld { ires, sr, lr })
         }
-        grid
+        AAMap(grid.0.map(|buf| leak_vec(buf) as &[_]))
     }
     pub fn score_sequence<'a>(&self, sequence: &aa_canonical_str) -> std::vec::Vec<ResidueDataOld> {
         let Some(n_sites) = sequence.len().checked_sub(2 * MIN_XMER) else {
