@@ -19,13 +19,14 @@ pub fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, F
         let Some(idx) = end_of_current_header(slice) else {
             eprintln!(
                 "could not parse entry (empty sequence): {}",
-                String::from_utf8_lossy(slice)
+                String::from_utf8_lossy(slice.strip_prefix(&[b'>']).unwrap_or(slice))
             );
             return entries;
         };
         let (header_slice, rest) = slice.split_at_mut(idx);
         debug_assert!(!header_slice.is_empty());
         debug_assert_eq!(header_slice[0], b'>');
+        let header_slice = &header_slice[1..];
         slice = &mut rest[1..];
         let rest: &mut [u8];
         let sequence_slice: &mut [u8];
