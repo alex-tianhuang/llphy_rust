@@ -4,4 +4,4 @@ pub(crate) use sequences::{
     FastaEntry, NotAminoacidError, NotCanonicalAAStrError, aa_canonical_str,
 };
 mod grid_score;
-pub(crate) use grid_score::{FeatureGridOld, GridScoreOld};
+pub(crate) use grid_score::{ResScoresOld, GridScoreOld};

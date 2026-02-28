@@ -15,15 +15,15 @@ pub struct ResidueDataOld {
     sr: f64,
     lr: f64
 }
-pub type FeatureGridOld<'a> = AAMap<Vec<'a, FeatureGridEntryOld>>;
+pub type ResScoresOld<'a> = AAMap<Vec<'a, ResScoresEntryOld>>;
 #[derive(Clone)]
-pub struct FeatureGridEntryOld {
+pub struct ResScoresEntryOld {
     ires: usize,
     sr: f64,
     lr: f64
 }
 impl GridScoreOld {
-    pub fn score_sequence_to_grid<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> FeatureGridOld<'a> {
+    pub fn score_sequence_to_grid<'a>(&self, sequence: &aa_canonical_str, arena: &'a Bump) -> ResScoresOld<'a> {
         let mut residue_counts = AAMap([0_usize; 20]);
         for aa in sequence {
             residue_counts[aa] += 1;
@@ -33,7 +33,7 @@ impl GridScoreOld {
             Vec::with_capacity_in(cap_bound, arena)
         }));
         for ResidueDataOld { ires, aa, sr, lr } in self.score_sequence(sequence) {
-            grid[aa].push(FeatureGridEntryOld { ires, sr, lr })
+            grid[aa].push(ResScoresEntryOld { ires, sr, lr })
         }
         grid
     }
