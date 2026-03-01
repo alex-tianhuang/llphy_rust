@@ -24,6 +24,7 @@ use bumpalo::{Bump, collections::Vec};
 use clap::Parser;
 mod datatypes;
 mod fasta;
+use indicatif::{self, ProgressBar};
 
 /// Program that computes phase separation propensity and related
 /// biophysical features of sequences from a given input file.
@@ -58,6 +59,11 @@ pub struct Args {
 /// written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
+/// 
+/// IO
+/// --
+/// This function calls [`read_fasta`] and [`seqs_to_grids`],
+/// which both touch the stderr output.
 pub fn bin_main(args: Args) -> Result<(), Error> {
     let Args {
         input_file,
@@ -75,7 +81,7 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
     let post_processor = load_post_processor(score_type, &arena);
     let model = leak_vec(load_llphy_model(&arena));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
-    let grids = leak_vec(seqs_to_grids(
+    let grids = leak_vec(seqs_to_grids::<true>(
         sequences,
         pdb_statistics_scorer,
         pdb_statistics_names,
@@ -114,13 +120,13 @@ fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
 /// it is ommitted from the returned slice.
 fn sort_feature_names<'a, 'b>(
     feature_names: &'a mut [&'b str],
-    pdb_statistics_names: &[(&str, &str)],
+    pdb_statistics_names: &[(&str, [&str; 2])],
 ) -> &'a mut [&'b str] {
     let mut num_not_present = 0;
     for name in feature_names.iter_mut() {
         if pdb_statistics_names
             .iter()
-            .find(|(sr_name, lr_name)| name == sr_name || name == lr_name)
+            .find(|(_, [sr_name, lr_name])| name == sr_name || name == lr_name)
             .is_none()
         {
             num_not_present += 1;
@@ -131,7 +137,7 @@ fn sort_feature_names<'a, 'b>(
         match pdb_statistics_names
             .iter()
             .enumerate()
-            .find(|(_, (sr_name, lr_name))| name == sr_name || name == lr_name)
+            .find(|(_, (_, [sr_name, lr_name]))| name == sr_name || name == lr_name)
         {
             Some((slot, (sr_name, _))) => {
                 if sr_name == name {
@@ -157,7 +163,7 @@ fn sort_feature_names<'a, 'b>(
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_named_pdb_statistics<'a>(
     arena: &'a Bump,
-) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer<'a>>) {
+) -> (Vec<'a, (&'a str, [&'a str; 2])>, Vec<'a, GridScorer<'a>>) {
     todo!()
 }
 
@@ -220,29 +226,42 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 /// written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn seqs_to_grids<'a>(
+/// 
+/// IO
+/// --
+/// If `PBAR` is true, this function
+/// prints the grid that is currently being worked on along with a
+/// progress bar to whatever the default terminal for [`indicatif`] is.
+fn seqs_to_grids<'a, const PBAR: bool>(
     sequences: &[FastaEntry<'_>],
     pdb_statistics_scorer: &[GridScorer],
-    pdb_statistics_names: &[(&str, &str)],
+    pdb_statistics_names: &[(&str, [&str; 2])],
     feature_names_requested: &[&str],
     arena: &'a Bump,
-) -> Vec<'a, &'a [FeatureGrid<'a>]> {
-    let mut grids = Vec::with_capacity_in(sequences.len(), arena);
-    for entry in sequences {
-        let mut feature_grid = Vec::with_capacity_in(pdb_statistics_scorer.len(), arena);
-        for ((sr_name, lr_name), grid_scorer) in
-            pdb_statistics_names.iter().zip(pdb_statistics_scorer)
+) -> Vec<'a, &'a mut [FeatureGrid<'a>]> {
+    let mut grids = Vec::from_iter_in((0..sequences.len()).map(|_| {
+        leak_vec(Vec::from_iter_in((0..pdb_statistics_scorer.len()).map(|_| AAMap::default()), arena))
+    }), arena);
+    for (idx, ((grid_name, [sr_name, lr_name]), grid_scorer)) in
+        pdb_statistics_names.iter().zip(pdb_statistics_scorer).enumerate()
+    {
+        if feature_names_requested.contains(sr_name)
+            || feature_names_requested.contains(lr_name)
         {
-            if feature_names_requested.contains(sr_name)
-                || feature_names_requested.contains(lr_name)
-            {
-                let grid_row = grid_scorer.score_sequence(entry.sequence, arena);
-                feature_grid.push(grid_row);
+            if PBAR {
+                let pbar = ProgressBar::new(sequences.len() as _);
+                pbar.println(bumpalo::format!(in arena, "CONVERTING SEQUENCES TO {} GRIDS", grid_name));
+                for (grid_row, entry) in grids.iter_mut().zip(sequences) {
+                    grid_row[idx] = grid_scorer.score_sequence(entry.sequence, arena);
+                    pbar.inc(1);
+                }
+                pbar.abandon();
             } else {
-                feature_grid.push(AAMap::default())
+                for (grid_row, entry) in grids.iter_mut().zip(sequences) {
+                    grid_row[idx] = grid_scorer.score_sequence(entry.sequence, arena);
+                }
             }
-        }
-        grids.push(leak_vec(feature_grid) as &[_]);
+        } 
     }
     grids
 }
@@ -273,9 +292,9 @@ pub struct G2WScores<'a> {
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn get_g2w_scores<'a>(
-    grids: &[&[FeatureGrid<'_>]],
+    grids: &[&mut [FeatureGrid<'_>]],
     model: &[LLPhyFeature],
-    pdb_statistics_names: &[(&str, &str)],
+    pdb_statistics_names: &[(&str, [&str; 2])],
     feature_names_requested: &[&str],
     arena: &'a Bump,
 ) -> Vec<'a, G2WScores<'a>> {
@@ -283,8 +302,8 @@ fn get_g2w_scores<'a>(
     for grid in grids {
         debug_assert_eq!(model.len(), grid.len());
         let mut subfeatures = Vec::with_capacity_in(model.len() * 2, arena);
-        for (((sr_name, lr_name), subfeature), grid_row) in
-            pdb_statistics_names.iter().zip(model).zip(*grid)
+        for (((_, [sr_name, lr_name]), subfeature), grid_row) in
+            pdb_statistics_names.iter().zip(model).zip(*grid as &[_])
         {
             if feature_names_requested.contains(sr_name) {
                 let sr_feat = subfeature.get_g2w_score_for_subfeature::<true>(grid_row);

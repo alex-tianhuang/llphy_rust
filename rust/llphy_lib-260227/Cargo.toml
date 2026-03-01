@@ -9,4 +9,5 @@ bumpalo = { version = "3.20.2", features = ["collections"] }
 bytesize = "2.3.1"
 clap = { version = "4.5.60", features = ["derive"] }
 csv = "1.4.0"
+indicatif = "0.18.4"
 thiserror = "2.0.18"
