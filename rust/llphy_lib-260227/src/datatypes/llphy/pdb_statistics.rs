@@ -280,13 +280,13 @@ impl GridScorer<'_> {
                 },
                 (None, None) => unreachable!()
             };
-            let (_, row) = table[sr_index];
-            debug_assert!(!row.is_empty());
             if let Some((best_sqr_delta, sr_index, lr_index)) = best_entry {
                 if best_sqr_delta <= sr_sqr_delta {
                     return table[sr_index].1[lr_index].1
                 }
             }
+            let (_, row) = table[sr_index];
+            debug_assert!(!row.is_empty());
             let (Ok(lr_index) | Err(lr_index)) = row.binary_search_by(|(lr_gridpoint, _)| lr_gridpoint.0.total_cmp(&zscore_lr));
             let mut check_lr_index = |lr_index: usize| {
                 if let Some((lr_gridpoint, _)) = row.get(lr_index) {
