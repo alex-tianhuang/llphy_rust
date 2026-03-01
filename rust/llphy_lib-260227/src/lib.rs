@@ -63,7 +63,7 @@ pub struct Args {
 /// IO
 /// --
 /// This function calls [`read_fasta`] and [`seqs_to_grids`],
-/// which both touch the stderr output.
+/// which both touch the stderr output. It also prints one message to stderr.
 pub fn bin_main(args: Args) -> Result<(), Error> {
     let Args {
         input_file,
@@ -88,6 +88,7 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
         feature_names,
         &arena,
     ));
+    eprintln!("CALCULATING SCORES");
     let output_scores = leak_vec(get_g2w_scores(
         grids,
         model,
