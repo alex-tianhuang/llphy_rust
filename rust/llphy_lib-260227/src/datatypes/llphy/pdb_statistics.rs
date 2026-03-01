@@ -7,7 +7,10 @@ use crate::{
 };
 use bumpalo::{Bump, collections::Vec};
 use std::{array, cmp};
+/// The minimum residue separation that we have collected residue statistics for.
 const MIN_XMER: usize = 1;
+/// The maximum residue separation that we have collected residue statistics for.
+const MAX_XMER: usize = 40;
 /// Placeholder struct that uses PDB-statistics to
 /// convert sequences to feature grids.
 /// 
@@ -104,7 +107,7 @@ impl GridScorer {
         AAMap(grid.0.map(|buf| leak_vec(buf) as &[_]))
     }
     /// Try and get a subsequence centered at the given `center` index,
-    /// starting at `self.max_xmer()` at shrinking until it fits inside
+    /// starting at `MAX_XMER` at shrinking until it fits inside
     /// the sequence.
     fn get_seq_centered_at<'a>(
         &self,
@@ -114,24 +117,20 @@ impl GridScorer {
         let space_on_left = center;
         let space_on_right = sequence.len() - 1 - center;
         let min_space = cmp::min(space_on_left, space_on_right);
-        let xmer = cmp::min(min_space, self.max_xmer());
+        let xmer = cmp::min(min_space, MAX_XMER);
         &sequence[center - xmer..center + xmer + 1]
-    }
-    /// The maximum residue separation that this struct has collected statistics for.
-    fn max_xmer(&self) -> usize {
-        todo!()
     }
     /// Get `(short-range, long-range)` statistics for the given subsequence.
     fn score_subseq_smart<'a>(&self, subseq: &aa_canonical_str) -> std::vec::Vec<(f64, f64)> {
         debug_assert!(subseq.len() % 2 == 1);
         let midpoint = subseq.len() / 2;
-        debug_assert!(midpoint <= self.max_xmer());
+        debug_assert!(midpoint <= MAX_XMER);
         let mut frequency_sum_a = 0.0;
         let mut frequency_sum_b = 0.0;
         let mut denom_total_a = 0.0;
         let mut denom_total_b = 0.0;
         let mid_res_aa = subseq[midpoint];
-        let cap = cmp::min(midpoint, self.max_xmer() - 1);
+        let cap = cmp::min(midpoint, MAX_XMER - 1);
         let mut scores = std::vec::Vec::with_capacity(cap);
         for p in 0..midpoint {
             let c_term_position = midpoint + 1 + p;
