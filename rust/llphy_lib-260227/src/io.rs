@@ -6,7 +6,6 @@ use std::{
     fs::File,
     io::{ErrorKind, Read, Seek},
     path::Path,
-    ptr::slice_from_raw_parts_mut,
 };
 
 /// Read the file at `path` into the given memory arena
@@ -19,16 +18,19 @@ pub fn read_file<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, u8>, Error>
     let filesize = file.metadata()?.len() as usize;
     let mut bytes = Vec::with_capacity_in(filesize, arena);
     // SAFETY: bytes have no initialization guarantees
-    let buf = unsafe { &mut *slice_from_raw_parts_mut(bytes.as_mut_ptr(), filesize) };
+    unsafe {
+        bytes.set_len(filesize);
+    };
+    let buf = &mut *bytes;
     match file.read_exact(buf) {
         Ok(()) => (),
         // This probably doesn't happen but I don't know if
         // metadata is guaranteed to be accurate.
         Err(ref e) if matches!(e.kind(), ErrorKind::UnexpectedEof) => {
             let actual_size = file.seek(std::io::SeekFrom::End(0))?;
-            return Err(wrong_file_size(buf.len() as _, actual_size))
-        },
-        Err(e) => return Err(e.into())
+            return Err(wrong_file_size(buf.len() as _, actual_size));
+        }
+        Err(e) => return Err(e.into()),
     };
     ensure_file_at_eof(file, buf.len() as _)?;
     Ok(bytes)
