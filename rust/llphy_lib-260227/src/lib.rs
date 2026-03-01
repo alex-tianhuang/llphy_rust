@@ -11,7 +11,7 @@ use std::{
 mod io;
 use crate::{
     datatypes::{
-        FastaEntry, GridScorer, LLPhyFeatureOld, PostProcessor, ResScoresOld, ScoreType,
+        FastaEntry, GridScorer, LLPhyFeatureOld, PostProcessor, FeatureGrid, ScoreType,
     },
     fasta::read_fasta,
 };
@@ -165,7 +165,7 @@ fn seqs_to_grids<'a>(
     sequences: &[FastaEntry<'_>],
     pdb_statistics: &[GridScorer],
     arena: &'a Bump,
-) -> Vec<'a, &'a [ResScoresOld<'a>]> {
+) -> Vec<'a, &'a [FeatureGrid<'a>]> {
     let mut grids = Vec::with_capacity_in(sequences.len(), arena);
     for entry in sequences {
         let mut feature_grid = Vec::with_capacity_in(pdb_statistics.len(), arena);
@@ -204,7 +204,7 @@ pub struct G2WScores<'a> {
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn get_g2w_scores<'a>(
-    grids: &[&[ResScoresOld<'_>]],
+    grids: &[&[FeatureGrid<'_>]],
     model: &[LLPhyFeatureOld],
     arena: &'a Bump,
 ) -> Vec<'a, G2WScores<'a>> {

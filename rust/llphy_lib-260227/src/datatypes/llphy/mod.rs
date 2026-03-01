@@ -1,5 +1,6 @@
+//! LLPhyScore-specific datatypes.
 mod pdb_statistics;
-pub(crate) use pdb_statistics::{GridScorer, ResScoresOld, ResScoresEntryOld};
+pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry};
 mod model;
 pub(crate) use model::LLPhyFeatureOld;
 mod post_processor;
