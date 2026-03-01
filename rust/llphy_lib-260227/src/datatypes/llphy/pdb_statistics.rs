@@ -249,17 +249,46 @@ impl GridScorer<'_> {
     ) -> (f64, f64, f64) {
         let table = self.z_grid_db[aa][xmer];
         let mut best_entry: Option<(f64, usize, usize)> = None;
-        for (sr_index, (sr_gridpoint, row)) in table.iter().enumerate() {
+        let (Ok(start_index) | Err(start_index)) = table.binary_search_by(|(sr_gridpoint, _)| sr_gridpoint.0.total_cmp(&zscore_sr));
+        // I assume this gets optimized out
+        let to_sr_sqr_delta = |x: f64| {
+            let sr_delta = x - zscore_sr;
+            sr_delta * sr_delta
+        };
+        let next_search_down = |idx: usize| idx.checked_sub(1).map(|i| (i, to_sr_sqr_delta(table[i].0.0)));
+        let next_search_up = |idx: usize| Some(idx).and_then(|i| table.get(i).map(|(lk, _)| (i, to_sr_sqr_delta(lk.0))));
+        let mut search_down = next_search_down(start_index);
+        let mut search_up = next_search_up(start_index);
+        for _ in 0..table.len() {
+            let (sr_index, sr_sqr_delta) = match (search_down, search_up) {
+                (Some((ptr_down, sr_sqr_delta_down)), Some((ptr_up, sr_sqr_delta_up))) => {
+                    if sr_sqr_delta_down < sr_sqr_delta_up {
+                        search_down = next_search_down(ptr_down);
+                        (ptr_down, sr_sqr_delta_down)
+                    } else {
+                        search_up = next_search_up(ptr_up + 1);
+                        (ptr_up, sr_sqr_delta_up) 
+                    }
+                },
+                (None, Some((ptr_up, sr_sqr_delta_up))) => {
+                    search_up = next_search_up(ptr_up + 1);
+                    (ptr_up, sr_sqr_delta_up)
+                }
+                (Some((ptr_down, sr_sqr_delta_down)), None) => {
+                    search_down = next_search_down(ptr_down);
+                    (ptr_down, sr_sqr_delta_down)
+                },
+                (None, None) => unreachable!()
+            };
+            let (_, row) = table[sr_index];
             debug_assert!(!row.is_empty());
-            let sr_delta = sr_gridpoint.0 - zscore_sr;
-            let sr_sqr_delta = sr_delta * sr_delta;
             if let Some((best_sqr_delta, sr_index, lr_index)) = best_entry {
-                if best_sqr_delta <= sr_delta && sr_gridpoint.0 > zscore_sr {
+                if best_sqr_delta <= sr_sqr_delta {
                     return table[sr_index].1[lr_index].1
                 }
             }
             let (Ok(lr_index) | Err(lr_index)) = row.binary_search_by(|(lr_gridpoint, _)| lr_gridpoint.0.total_cmp(&zscore_lr));
-            let mut test_lr_index = |lr_index: usize| {
+            let mut check_lr_index = |lr_index: usize| {
                 if let Some((lr_gridpoint, _)) = row.get(lr_index) {
                     let lr_delta = lr_gridpoint.0 - zscore_lr;
                     let lr_sqr_delta = lr_delta * lr_delta;
@@ -271,11 +300,11 @@ impl GridScorer<'_> {
                     }
                 }
             };
-            test_lr_index(lr_index);
+            check_lr_index(lr_index);
             let Some(lr_index) = lr_index.checked_sub(1) else {
                 continue;
             };
-            test_lr_index(lr_index);
+            check_lr_index(lr_index);
         } 
         let (_, sr_index, lr_index) = best_entry.unwrap();
         table[sr_index].1[lr_index].1
