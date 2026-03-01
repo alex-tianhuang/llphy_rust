@@ -1,4 +1,4 @@
-use crate::datatypes::{AAMap, ResScoresOld, ResScoresEntryOld};
+use crate::datatypes::{AAMap, FeatureGrid, FeatureGridEntry};
 
 pub struct LLPhyFeatureOld {
     weights: AAMap<LLPhyWeightOld>,
@@ -14,14 +14,14 @@ pub struct LLPhySignOld {
 }
 
 impl LLPhyFeatureOld {
-    pub fn get_sr_lr_g2w_score(&self, grid_row: &ResScoresOld<'_>) -> (isize, isize) {
+    pub fn get_sr_lr_g2w_score(&self, grid_row: &FeatureGrid<'_>) -> (isize, isize) {
         let sr_score = self.get_g2w_score_for_subfeature::<true>(grid_row);
         let lr_score = self.get_g2w_score_for_subfeature::<false>(grid_row);
         (sr_score, lr_score)
     }
     fn get_g2w_score_for_subfeature<const SR: bool>(
         &self,
-        grid_row: &AAMap<&[ResScoresEntryOld]>,
+        grid_row: &AAMap<&[FeatureGridEntry]>,
     ) -> isize {
         let mut sum_score = 0;
         for (weight, &res_scores) in self.weights.values().zip(grid_row.values()) {
