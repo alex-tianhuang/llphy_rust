@@ -1,3 +1,10 @@
+[project]
+name = "llphyscore"
+dependencies = [
+    "numpy"
+]
+version = "1.0.0"
+
 [tool.maturin]
 module-name = "llphyscore._rust"
 python-source = "../../python/alex_llphy_maturin-260301"
