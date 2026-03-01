@@ -1,4 +1,4 @@
-use crate::datatypes::{AAMap, ResScoresOld, grid_score::ResScoresEntryOld};
+use crate::datatypes::{AAMap, ResScoresOld, grid_scorer::ResScoresEntryOld};
 
 pub struct LLPhyFeatureOld {
     weights: AAMap<LLPhyWeightOld>,
