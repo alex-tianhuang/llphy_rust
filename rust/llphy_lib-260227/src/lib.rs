@@ -256,15 +256,6 @@ fn write_output(
             write_row = arena.alloc(|row| stdout_writer.write_record(row))
         }
     }
-    struct DropWriterWrapper<'a>(&'a mut dyn FnMut(&[&str]) -> Result<(), csv::Error>);
-    impl Drop for DropWriterWrapper<'_> {
-        fn drop(&mut self) {
-            unsafe {
-                ptr::drop_in_place(self.0);
-            }
-        }
-    }
-    let writer = DropWriterWrapper(write_row);
     let mut column_buffer = Vec::with_capacity_in(feature_names.len() + 2, arena);
     let values_buffer = leak_vec(Vec::from_iter_in(
         (0..feature_names.len() + 1).map(|_| bumpalo::format!(in arena, "{}", 2.0_f64.sqrt())),
@@ -275,7 +266,7 @@ fn write_output(
     column_buffer.push("tag");
     column_buffer.extend_from_slice(feature_names);
     column_buffer.push(unsafe { &*(&*feature_sum_column_name as *const str) });
-    writer.0(&column_buffer)?;
+    write_row(&column_buffer)?;
     for (entry, output_row) in sequences.iter().zip(output_scores) {
         let [tag_slot, feature_slots @ .., feature_sum_slot] = &mut *column_buffer else {
             unreachable!()
@@ -296,7 +287,7 @@ fn write_output(
         }
         write!(feature_sum_buffer, "{}", output_row.feature_sum).unwrap();
         *feature_sum_slot = unsafe { &*(&**feature_sum_buffer as *const str) };
-        writer.0(&column_buffer)?;
+        write_row(&column_buffer)?;
     }
     Ok(())
 }
