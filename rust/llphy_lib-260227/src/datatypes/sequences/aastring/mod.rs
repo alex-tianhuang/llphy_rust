@@ -5,8 +5,7 @@
 //! aminoacids are allowed, the most general implementation
 //! are in the [`generic`] module.
 //!
-//! For this crate, I just used the default [`Aminoacid`] strings
-//! [`aa_canonical_str`] and [`AACanonicalString`].
+//! For this crate, I just used [`Aminoacid`] and [`aa_canonical_str`].
 pub(crate) mod generic;
 use crate::datatypes::Aminoacid;
 use generic::AALike;
