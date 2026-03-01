@@ -46,25 +46,11 @@ impl<T> AAMap<T> {
     pub fn iter(&self) -> impl Iterator<Item = (Aminoacid, &T)> {
         AMINOACIDS.into_iter().zip(self.0.iter())
     }
-    /// Iterate over (aa, &mut value) pairs, like a regular map.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Aminoacid, &mut T)> {
-        AMINOACIDS.into_iter().zip(self.0.iter_mut())
-    }
     /// Iterate over values by reference, like a regular map.
     /// The order of the iterator is still the same as the declaration
     /// order of amino acids.
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
-    }
-    /// Iterate over values by mutable reference, like a regular map.
-    /// The order of the iterator is still the same as the declaration
-    /// order of amino acids.
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.0.iter_mut()
-    }
-    /// Map this residue map to a new one by applying `f` to value references.
-    pub fn map_refs<V>(&self, f: impl FnMut(&T) -> V) -> AAMap<V> {
-        AAMap(self.0.each_ref().map(f))
     }
 }
 impl<T> Index<Aminoacid> for AAMap<T> {
