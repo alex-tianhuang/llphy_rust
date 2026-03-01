@@ -8,10 +8,9 @@ pub use aamap::{
     AAMap,
 };
 pub(crate) use aastring::aa_canonical_str;
-pub(crate) use aminoacid::{AAIndex, AMINOACIDS, Aminoacid, NotAminoacidError};
+pub(crate) use aminoacid::{AAIndex, AMINOACIDS, Aminoacid};
 
 /// Fasta entry, containing a sequence and header.
-#[derive(Clone, Copy)]
 pub struct FastaEntry<'a> {
     pub header: &'a str,
     pub sequence: &'a aa_canonical_str,

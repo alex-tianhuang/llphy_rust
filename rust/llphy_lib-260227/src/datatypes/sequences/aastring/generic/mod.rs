@@ -5,8 +5,7 @@
 use std::fmt::Debug;
 mod borrowed;
 mod owned;
-pub use borrowed::{NotAAStrError, aa_str};
-pub use owned::{AAString, AAStringStrict};
+pub use borrowed::{aa_str};
 /// A one-byte datatype that is representable by a subset
 /// (single-byte, not arbitrary chars) of displayable characters.
 ///

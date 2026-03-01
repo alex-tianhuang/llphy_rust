@@ -8,7 +8,6 @@ const MIN_XMER: usize = 1;
 pub struct GridScoreOld {}
 pub struct ResidueDataOld {
     aa: Aminoacid,
-    // n_outside_grid: usize,
     sr: f64,
     lr: f64,
 }
@@ -45,11 +44,7 @@ impl GridScoreOld {
         for i in 1..=n_sites {
             let mid_res = sequence[i];
             let mut grid_counts = [0.0, 0.0, 0.0];
-            // let mut n_outside_grid = 0;
             let m_seq = self.get_middle_seq_centered_at(sequence, i);
-            // let mut avg_zscore_sr = 0.0;
-            // let mut avg_zscore_lr = 0.0;
-            // let mut zscore_n = 0.0;
             debug_assert!(m_seq.len() >= 2 * MIN_XMER + 1);
             let all_xmer_scores = self.score_mseq_smart(m_seq);
             for (xmer, (freq_sr, freq_lr)) in (MIN_XMER..).zip(all_xmer_scores) {
@@ -59,14 +54,10 @@ impl GridScoreOld {
                 let zscore_lr = (freq_lr - mean_lr) / std_lr;
                 let sr_key = make_linekey(zscore_sr);
                 let lr_key = make_linekey(zscore_lr);
-                // avg_zscore_sr += zscore_sr;
-                // avg_zscore_lr += zscore_lr;
-                // zscore_n += 1.0;
                 let [total_slot, sr_slot, lr_slot] = &mut grid_counts;
                 let (total, sr, lr) = self
                     .query_zgrid_db_exact(mid_res, xmer, sr_key, lr_key)
                     .unwrap_or_else(|| {
-                        // n_outside_grid += 1;
                         self.query_zgrid_db_nearest(mid_res, xmer, sr_key, lr_key)
                     });
                 *total_slot += total;
@@ -79,12 +70,9 @@ impl GridScoreOld {
             if total > 0.0 {
                 freq_by_grid_sr = sr / total;
                 freq_by_grid_lr = lr / total;
-                // avg_zscore_sr /= zscore_n;
-                // avg_zscore_lr /= zscore_n;
             }
             score_data.push(ResidueDataOld {
                 aa: mid_res,
-                // n_outside_grid,
                 sr: freq_by_grid_sr,
                 lr: freq_by_grid_lr,
             });
