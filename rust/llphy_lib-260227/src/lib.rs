@@ -13,7 +13,7 @@ use crate::{
     datatypes::{
         FastaEntry, GridScorer, LLPhyFeatureOld, PostProcessor, ResScoresOld, ScoreType,
     },
-    io::read_fasta,
+    fasta::read_fasta,
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};

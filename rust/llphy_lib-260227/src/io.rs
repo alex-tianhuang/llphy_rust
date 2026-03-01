@@ -1,41 +1,14 @@
-//! Module defining [`read_fasta`]
-use crate::{datatypes::FastaEntry, fasta::parse_fasta_entries};
+//! Module defining [`read_file`].
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
 use bytesize::ByteSize;
 use std::{
     fs::File,
     io::{ErrorKind, Read, Seek},
-    path::{Path, PathBuf},
+    path::Path,
     ptr::slice_from_raw_parts_mut,
 };
 
-/// Read the file at `path` into a memory arena, and parse it into
-/// a vector of [`FastaEntry`] structs.
-/// 
-/// In addition to failing if the file cannot be read from, it will
-/// fail if the file is empty or does not start with a `>` character.
-/// 
-/// IO
-/// --
-/// May log warnings to stderr, because it calls [`parse_fasta_entries`]
-/// which logs to stderr.
-pub fn read_fasta(path: PathBuf, arena: &Bump) -> Result<Vec<'_, FastaEntry<'_>>, Error> {
-    let bytes = read_file(&path, arena)?;
-    if bytes.is_empty() {
-        return Err(Error::msg(format!(
-            "expected non-empty fasta file at {}, got empty file",
-            path.display()
-        )));
-    }
-    if !bytes.starts_with(&[b'>']) {
-        return Err(Error::msg(format!(
-            "expected fasta file at {}, got non-`>` character on first line",
-            path.display()
-        )));
-    }
-    Ok(parse_fasta_entries(bytes, arena))
-}
 /// Read the file at `path` into the given memory arena
 /// as a vector of bytes.
 pub fn read_file<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, u8>, Error> {

@@ -1,17 +1,49 @@
-//! Module defining [`parse_fasta_entries`].
-use crate::{datatypes::{Aminoacid, FastaEntry, aa_canonical_str}, leak_vec};
+//! Module defining [`read_fasta`].
+use crate::{
+    datatypes::{Aminoacid, FastaEntry, aa_canonical_str},
+    io::read_file,
+    leak_vec,
+};
+use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
+use std::path::PathBuf;
 
+/// Read the file at `path` into a memory arena, and parse it into
+/// a vector of [`FastaEntry`] structs.
+///
+/// In addition to failing if the file cannot be read from, it will
+/// fail if the file is empty or does not start with a `>` character.
+///
+/// IO
+/// --
+/// May log warnings to stderr,
+/// because it calls [`parse_fasta_entries`] which logs to stderr.
+pub fn read_fasta(path: PathBuf, arena: &Bump) -> Result<Vec<'_, FastaEntry<'_>>, Error> {
+    let bytes = read_file(&path, arena)?;
+    if bytes.is_empty() {
+        return Err(Error::msg(format!(
+            "expected non-empty fasta file at {}, got empty file",
+            path.display()
+        )));
+    }
+    if !bytes.starts_with(&[b'>']) {
+        return Err(Error::msg(format!(
+            "expected fasta file at {}, got non-`>` character on first line",
+            path.display()
+        )));
+    }
+    Ok(parse_fasta_entries(bytes, arena))
+}
 /// Parse a buffer with FASTA-formatted sequences
 /// into a vector of [`FastaEntry`] structs.
-/// 
+///
 /// IO
 /// --
 /// This function logs to stderr when it encounters:
 /// - Headers that are non-UTF8
 /// - Sequences that contain non aminoacid (lowercase or uppercase) characters
 /// - Sequences that are empty (after removing all non aminoacid characters)
-pub fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, FastaEntry<'a>> {
+fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, FastaEntry<'a>> {
     let mut slice = leak_vec(bytes);
     let mut entries = Vec::new_in(arena);
     while !slice.is_empty() {
@@ -69,7 +101,7 @@ pub fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, F
             ParseResult::Empty => {
                 eprintln!("could not parse entry (empty sequence): {}", header);
                 continue;
-            },
+            }
             ParseResult::EmptyAndInvalidBytes => {
                 eprintln!("could not parse entry (all invalid bytes): {}", header);
                 continue;
@@ -107,10 +139,10 @@ enum ParseResult<'a> {
     Empty,
     /// The sequence contained characters but none of them were
     /// convertible to aminoacids.
-    EmptyAndInvalidBytes
+    EmptyAndInvalidBytes,
 }
 /// Parse an [`aa_canonical_str`] from the given slice of bytes.
-/// 
+///
 /// Parsing is done loosely, converting lowercase to uppercase and
 /// removing unexpected characters rather than failing outright.
 /// It will only fail if the sequence does not contain any aminoacids.
@@ -134,10 +166,7 @@ fn parse_sequence(slice: &mut [u8]) -> ParseResult<'_> {
         break;
     }
     let Some(start) = non_aa_start_idx else {
-        // SAFETY: to reach this point all bytes in `slice`
-        //         having never reached the break statement
-        //         in the loop above
-        unsafe { return ParseResult::Ok(aa_canonical_str::from_bytes_unchecked(slice)) }
+        return ParseResult::Ok(aa_canonical_str::from_bytes(slice).unwrap())
     };
     let mut len = start;
     let mut cursor = start;
@@ -155,11 +184,10 @@ fn parse_sequence(slice: &mut [u8]) -> ParseResult<'_> {
         if warn {
             return ParseResult::EmptyAndInvalidBytes;
         } else {
-            return ParseResult::Empty
+            return ParseResult::Empty;
         }
     }
-    // SAFETY: safe for the same reason `Vec::retain` is safe.
-    let s = unsafe { aa_canonical_str::from_bytes_unchecked(&slice[..len]) };
+    let s = aa_canonical_str::from_bytes(&slice[..len]).unwrap();
     if warn {
         ParseResult::WarnInvalidBytes(s)
     } else {
@@ -167,7 +195,7 @@ fn parse_sequence(slice: &mut [u8]) -> ParseResult<'_> {
     }
 }
 /// Checks whether this byte merits a warning for this sequence.
-/// 
+///
 /// Right now I ignore whitespace characters.
 fn should_warn(b: u8) -> bool {
     !b.is_ascii_whitespace()
