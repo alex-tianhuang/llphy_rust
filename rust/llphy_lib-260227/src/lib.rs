@@ -63,13 +63,16 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
     // Everything de-allocates when this does,
     // so no need to de-allocate anything else!
     let arena = Bump::new();
+    let (pdb_statistics_names, pdb_statistics_scorer) = load_named_pdb_statistics(&arena);
+    let pdb_statistics_names = leak_vec(pdb_statistics_names);
+    let pdb_statistics_scorer = leak_vec(pdb_statistics_scorer);
     let feature_names = leak_vec(load_feature_names(&arena));
-    let pdb_statistics = leak_vec(load_pdb_statistics(feature_names, &arena));
-    let post_processor = load_post_processor(score_type, feature_names, &arena);
-    let model = leak_vec(load_llphy_model(feature_names, &arena));
+    sort_feature_names(feature_names, pdb_statistics_names);
+    let post_processor = load_post_processor(score_type, &arena);
+    let model = leak_vec(load_llphy_model(&arena));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
-    let grids = leak_vec(seqs_to_grids(sequences, pdb_statistics, &arena));
-    let output_scores = leak_vec(get_g2w_scores(grids, model, &arena));
+    let grids = leak_vec(seqs_to_grids(sequences, pdb_statistics_scorer, &arena));
+    let output_scores = leak_vec(get_g2w_scores(grids, model, pdb_statistics_names, feature_names, &arena));
     post_process(post_processor, output_scores);
     write_output(output_file, output_scores, sequences, feature_names, &arena)?;
     Ok(())
@@ -87,9 +90,40 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
 fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
     todo!()
 }
-/// Load PDB statistics that help compute [`seqs_to_grids`].
-/// `feature_names` should be used to determine the order of
-/// features returned. 
+/// Sort feature names in the order in which they will be traversed.
+/// 
+/// The traversal order is defined by flattening the `pdb_statistics_names`
+/// and filtering out names that do not appear in `feature_names`.
+/// 
+/// If a feature name is not in the `pdb_statistics_names`,
+/// it is ommitted from the returned slice.
+fn sort_feature_names<'a, 'b>(feature_names: &'a mut [&'b str], pdb_statistics_names: &[(&str, &str)]) -> &'a mut [&'b str] {
+    let mut num_not_present = 0;
+    for name in feature_names.iter_mut() {
+        if pdb_statistics_names.iter().find(|(sr_name, lr_name)| name == sr_name || name == lr_name).is_none() {
+            num_not_present += 1;
+        }
+    }
+    // The feature names slice is like 8 long, so `8 x log(8) x pdb_statistics_names.len()` time seems ok.
+    feature_names.sort_by_key(|name| {
+        match pdb_statistics_names.iter().enumerate().find(|(_, (sr_name, lr_name))| name == sr_name || name == lr_name) {
+            Some((slot, (sr_name, _))) => {
+                if sr_name == name {
+                    (slot, 0)
+                } else {
+                    (slot, 1)
+                }
+            },
+            None => {
+                (usize::MAX, 0)
+            }
+        }
+    });
+    let len = feature_names.len() - num_not_present;
+    &mut feature_names[..len]
+}
+/// Load PDB statistics that help compute [`seqs_to_grids`],
+/// and the names of the long and short range statistics.
 /// 
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the `GridScore` class instances in the
@@ -97,7 +131,7 @@ fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
 /// lab's [python package], written by Hao Cai (@haocai1992).
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_pdb_statistics<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, GridScorer> {
+fn load_named_pdb_statistics<'a>(arena: &'a Bump) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer>) {
     todo!()
 }
 
@@ -112,7 +146,7 @@ fn load_pdb_statistics<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, G
 /// lab's [python package], written by Hao Cai (@haocai1992).
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_post_processor<'a>(score_type: ScoreType, feature_names: &[&str], arena: &'a Bump) -> PostProcessor<'a> {
+fn load_post_processor<'a>(score_type: ScoreType, arena: &'a Bump) -> PostProcessor<'a> {
     match score_type {
         ScoreType::Raw => PostProcessor::new_raw(),
         ScoreType::ZScore => {
@@ -138,8 +172,6 @@ fn load_reference_g2w_scores(arena: &Bump) -> Vec<'_, G2WScores<'_>> {
 
 /// Load the ML model that converts residue-level feature grids
 /// into sequence-level biophysical feature values in [`get_g2w_scores`].
-/// `feature_names` should be used to determine the order of
-/// features returned. 
 /// 
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the global `final_models` dictionary
@@ -148,7 +180,7 @@ fn load_reference_g2w_scores(arena: &Bump) -> Vec<'_, G2WScores<'_>> {
 /// (@haocai1992).
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_llphy_model<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
+fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
     todo!()
 }
 
@@ -163,13 +195,13 @@ fn load_llphy_model<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, LLPh
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn seqs_to_grids<'a>(
     sequences: &[FastaEntry<'_>],
-    pdb_statistics: &[GridScorer],
+    pdb_statistics_scorer: &[GridScorer],
     arena: &'a Bump,
 ) -> Vec<'a, &'a [FeatureGrid<'a>]> {
     let mut grids = Vec::with_capacity_in(sequences.len(), arena);
     for entry in sequences {
-        let mut feature_grid = Vec::with_capacity_in(pdb_statistics.len(), arena);
-        for grid_scorer in pdb_statistics {
+        let mut feature_grid = Vec::with_capacity_in(pdb_statistics_scorer.len(), arena);
+        for grid_scorer in pdb_statistics_scorer {
             let res_scores = grid_scorer.score_sequence(entry.sequence, arena);
             feature_grid.push(res_scores);
         }
@@ -206,16 +238,23 @@ pub struct G2WScores<'a> {
 fn get_g2w_scores<'a>(
     grids: &[&[FeatureGrid<'_>]],
     model: &[LLPhyFeature],
+    pdb_statistics_names: &[(&str, &str)],
+    feature_names_requested: &[&str],
     arena: &'a Bump,
 ) -> Vec<'a, G2WScores<'a>> {
     let mut scores = Vec::with_capacity_in(grids.len(), arena);
     for grid in grids {
         debug_assert_eq!(model.len(), grid.len());
         let mut subfeatures = Vec::with_capacity_in(model.len() * 2, arena);
-        for (subfeature, grid_row) in model.iter().zip(*grid) {
-            let (sr_feat, lr_feat) = subfeature.get_sr_lr_g2w_score(grid_row);
-            subfeatures.push(sr_feat as f64);
-            subfeatures.push(lr_feat as f64);
+        for (((sr_name, lr_name),subfeature), grid_row) in pdb_statistics_names.iter().zip(model).zip(*grid) {
+            if feature_names_requested.contains(sr_name) {
+                let sr_feat= subfeature.get_g2w_score_for_subfeature::<true>(grid_row);
+                subfeatures.push(sr_feat as f64);
+            }
+            if feature_names_requested.contains(lr_name) {
+                let lr_feat= subfeature.get_g2w_score_for_subfeature::<false>(grid_row);
+                subfeatures.push(lr_feat as f64);
+            }
         }
         let feature_sum = subfeatures.iter().sum::<f64>();
         scores.push(G2WScores {

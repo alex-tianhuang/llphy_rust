@@ -27,17 +27,9 @@ struct LLPhySigns {
 }
 
 impl LLPhyFeature {
-    /// For a given `grid_row` (feature-grid for one feature),
-    /// get the short-range and long-range feature values
-    /// at the sequence-level.
-    pub fn get_sr_lr_g2w_score(&self, grid_row: &FeatureGrid<'_>) -> (isize, isize) {
-        let sr_score = self.get_g2w_score_for_subfeature::<true>(grid_row);
-        let lr_score = self.get_g2w_score_for_subfeature::<false>(grid_row);
-        (sr_score, lr_score)
-    }
     /// Get either the short-range or long-range feature values
     /// given a `grid_row` (feature-grid for one feature).
-    fn get_g2w_score_for_subfeature<const SR: bool>(
+    pub fn get_g2w_score_for_subfeature<const SR: bool>(
         &self,
         grid_row: &AAMap<&[FeatureGridEntry]>,
     ) -> isize {
