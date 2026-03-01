@@ -1,8 +1,5 @@
-//! Binary
 use std::{
-    fmt::Write,
-    mem::{self, ManuallyDrop},
-    path::PathBuf,
+    fmt::Write, fs::File, io::{StdoutLock, stdout}, mem::{self, ManuallyDrop}, path::PathBuf, ptr
 };
 mod io;
 use crate::{
@@ -17,12 +14,17 @@ use clap::Parser;
 mod datatypes;
 mod fasta;
 
+/// Program that computes phase separation propensity and related
+/// biophysical features of sequences from a given input file.
 #[derive(Parser)]
+#[clap(verbatim_doc_comment)]
 pub struct Args {
+    /// Input file, in FASTA format.
     #[arg(short, long)]
     input_file: PathBuf,
+    /// Output file, a CSV.
     #[arg(short, long)]
-    output_file: PathBuf,
+    output_file: Option<PathBuf>,
     #[arg(short, long, default_value = "percentile")]
     score_type: ScoreType,
 }
@@ -132,13 +134,34 @@ fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
     todo!()
 }
 fn write_output(
-    path: PathBuf,
+    path: Option<PathBuf>,
     output_scores: &[G2WScoresOld<'_>],
     sequences: &[FastaEntry<'_>],
     feature_names: &[&str],
     arena: &Bump,
 ) -> Result<(), Error> {
-    let mut writer = csv::Writer::from_path(path)?;
+    let mut stdout_writer: csv::Writer<StdoutLock>;
+    let mut file_writer: csv::Writer<File>;
+    let write_row: &mut dyn FnMut(&[&str]) -> Result<(), csv::Error>;
+    match path {
+        Some(path) => {
+            file_writer = csv::Writer::from_path(path)?;
+            write_row = arena.alloc(|row| file_writer.write_record(row))
+        },
+        None => {
+            stdout_writer = csv::Writer::from_writer(stdout().lock());
+            write_row = arena.alloc(|row| stdout_writer.write_record(row))
+        }
+    }
+    struct DropWriterWrapper<'a>(&'a mut dyn FnMut(&[&str]) -> Result<(), csv::Error>);
+    impl Drop for DropWriterWrapper<'_> {
+        fn drop(&mut self) {
+            unsafe {
+                ptr::drop_in_place(self.0);
+            }
+        }
+    }
+    let writer = DropWriterWrapper(write_row);
     let mut column_buffer = Vec::with_capacity_in(feature_names.len() + 2, arena);
     let values_buffer = leak_vec(Vec::from_iter_in(
         (0..feature_names.len() + 1).map(|_| bumpalo::format!(in arena, "{}", 2.0_f64.sqrt())),
@@ -149,7 +172,7 @@ fn write_output(
     column_buffer.push("tag");
     column_buffer.extend_from_slice(feature_names);
     column_buffer.push(unsafe { &*(&*feature_sum_column_name as *const str) });
-    writer.write_record(&column_buffer)?;
+    writer.0(&column_buffer)?;
     for (entry, output_row) in sequences.iter().zip(output_scores) {
         let [tag_slot, feature_slots @ .., feature_sum_slot] = &mut *column_buffer else {
             unreachable!()
@@ -170,7 +193,7 @@ fn write_output(
         }
         write!(feature_sum_buffer, "{}", output_row.feature_sum).unwrap();
         *feature_sum_slot = unsafe { &*(&**feature_sum_buffer as *const str) };
-        writer.write_record(&column_buffer)?;
+        writer.0(&column_buffer)?;
     }
     Ok(())
 }
