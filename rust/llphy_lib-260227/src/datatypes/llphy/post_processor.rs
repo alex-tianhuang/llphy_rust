@@ -1,12 +1,18 @@
-use crate::{G2WScoresOld, leak_vec};
+use crate::{G2WScores, leak_vec};
 use bumpalo::{Bump, collections::Vec};
 use clap::ValueEnum;
 
+/// The type of score to return.
 #[derive(Clone, ValueEnum)]
+#[value(verbatim_doc_comment)]
 pub enum ScoreType {
-    ZScore,
-    Percentile,
+    /// Report raw `llphyscore` values and features (integers).
     Raw,
+    /// Report z-scores in comparison to a reference proteome. 
+    ZScore,
+    /// Report values in as percentiles compared to a reference proteome.
+    Percentile,
+    
 }
 pub enum PostProcessor<'a> {
     ZScore {
@@ -24,7 +30,7 @@ impl<'a> PostProcessor<'a> {
         PostProcessor::Raw
     }
     pub fn new_zscore(
-        data: Vec<'_, G2WScoresOld<'_>>,
+        data: Vec<'_, G2WScores<'_>>,
         num_features: usize,
         arena: &'a Bump,
     ) -> Self {
@@ -37,7 +43,7 @@ impl<'a> PostProcessor<'a> {
         }
     }
     pub fn new_percentile(
-        data: Vec<'_, G2WScoresOld<'_>>,
+        data: Vec<'_, G2WScores<'_>>,
         num_features: usize,
         arena: &'a Bump,
     ) -> Self {
@@ -66,7 +72,7 @@ impl<'a> PostProcessor<'a> {
             subfeatures: leak_vec(subfeatures),
         }
     }
-    pub fn transform(&self, data: &mut G2WScoresOld<'_>) {
+    pub fn transform(&self, data: &mut G2WScores<'_>) {
         match *self {
             Self::Raw => (),
             Self::ZScore {

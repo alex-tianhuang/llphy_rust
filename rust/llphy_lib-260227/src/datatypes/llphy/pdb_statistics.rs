@@ -5,7 +5,7 @@ use crate::{
 use bumpalo::{Bump, collections::Vec};
 use std::{array, cmp};
 const MIN_XMER: usize = 1;
-pub struct GridScoreOld {}
+pub struct GridScorer {}
 pub struct ResidueDataOld {
     aa: Aminoacid,
     sr: f64,
@@ -19,7 +19,7 @@ pub struct ResScoresEntryOld {
 }
 #[derive(Clone, Copy)]
 struct LineKey(f64);
-impl GridScoreOld {
+impl GridScorer {
     pub fn score_sequence_to_res_scores<'a>(
         &self,
         sequence: &aa_canonical_str,
