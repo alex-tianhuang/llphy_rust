@@ -125,7 +125,7 @@ impl GridScorer<'_> {
         &sequence[center - xmer..center + xmer + 1]
     }
     /// Get `(short-range, long-range)` statistics for the given subsequence.
-    fn score_subseq_smart<'a>(&self, subseq: &aa_canonical_str) -> std::vec::Vec<(f64, f64)> {
+    fn score_subseq_smart<'a>(&self, subseq: &aa_canonical_str) -> impl ExactSizeIterator<Item = (f64, f64)> {
         debug_assert!(subseq.len() % 2 == 1);
         let midpoint = subseq.len() / 2;
         debug_assert!(midpoint <= MAX_XMER);
@@ -135,8 +135,7 @@ impl GridScorer<'_> {
         let mut denom_total_b = 0.0;
         let aa = subseq[midpoint];
         let cap = cmp::min(midpoint, MAX_XMER - 1);
-        let mut scores = std::vec::Vec::with_capacity(cap);
-        for p in 0..midpoint {
+        (0..cap).map(move |p| {
             let c_term_position = midpoint + 1 + p;
             let (freq_a, std_a) =
                 self.query_freq_pair_db::<true, true>(aa, subseq[c_term_position], p);
@@ -155,13 +154,10 @@ impl GridScorer<'_> {
             frequency_sum_b += freq_b / std_b;
             denom_total_a += 1.0 / std_a;
             denom_total_b += 1.0 / std_b;
-            if p < cap {
-                let final_frequency_a = frequency_sum_a / denom_total_a;
-                let final_frequency_b = frequency_sum_b / denom_total_b;
-                scores.push((final_frequency_a, final_frequency_b))
-            }
-        }
-        scores
+            let final_frequency_a = frequency_sum_a / denom_total_a;
+            let final_frequency_b = frequency_sum_b / denom_total_b;
+            (final_frequency_a, final_frequency_b)
+        })
     }
     /// Method for getting a `(mean, std)` pair from the "pair-frequency-DB".
     /// 
