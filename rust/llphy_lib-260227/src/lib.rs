@@ -1,17 +1,21 @@
 //! A library for computing phase separation propensity
 //! and related biophysical features of sequences.
-//! 
+//!
 //! Based on the [python library] from Julie Forman-Kay's lab,
 //! written by Hao Cai (@haocai1992).
-//! 
+//!
 //! [python library]: https://github.com/julie-forman-kay-lab/LLPhyScore
 use std::{
-    fmt::Write, fs::File, io::{StdoutLock, stdout}, mem::{self, ManuallyDrop}, path::PathBuf, ptr
+    fmt::Write,
+    fs::File,
+    io::{StdoutLock, stdout},
+    mem::{self, ManuallyDrop},
+    path::PathBuf
 };
 mod io;
 use crate::{
     datatypes::{
-        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, PostProcessor, ScoreType
+        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, PostProcessor, ScoreType,
     },
     fasta::read_fasta,
 };
@@ -26,7 +30,7 @@ mod fasta;
 ///
 /// Based on the [python library] from Julie Forman-Kay's lab,
 /// written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python library]: https://github.com/julie-forman-kay-lab/LLPhyScore
 #[derive(Parser)]
 #[clap(verbatim_doc_comment, name = "llphyscore")]
@@ -42,17 +46,17 @@ pub struct Args {
     score_type: ScoreType,
 }
 /// Main method for the binary.
-/// 
+///
 /// Loads sequences from `args.input_file`,
 /// computes biophysical feature grids and then
 /// computes the phase separation propensity,
 /// reporting it to `args.output_file`.
-/// 
+///
 /// This function is based on the `run_fasta_scorer`
 /// function in the standalone LLPhyScore executable
 /// found in Julie Forman-Kay's lab's [python package],
 /// written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 pub fn bin_main(args: Args) -> Result<(), Error> {
     let Args {
@@ -71,52 +75,72 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
     let post_processor = load_post_processor(score_type, &arena);
     let model = leak_vec(load_llphy_model(&arena));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
-    let grids = leak_vec(seqs_to_grids(sequences, pdb_statistics_scorer,pdb_statistics_names, feature_names, &arena));
-    let output_scores = leak_vec(get_g2w_scores(grids, model, pdb_statistics_names, feature_names, &arena));
+    let grids = leak_vec(seqs_to_grids(
+        sequences,
+        pdb_statistics_scorer,
+        pdb_statistics_names,
+        feature_names,
+        &arena,
+    ));
+    let output_scores = leak_vec(get_g2w_scores(
+        grids,
+        model,
+        pdb_statistics_names,
+        feature_names,
+        &arena,
+    ));
     post_process(post_processor, output_scores);
     write_output(output_file, output_scores, sequences, feature_names, &arena)?;
     Ok(())
 }
 
-
 /// Placeholder for some feature names.
-/// 
+///
 /// In the standalone LLPhyScore executable found in
 /// Julie Forman-Kay's lab's [python package] written
 /// by Hao Cai (@haocai1992), feature names exist
 /// as a global hard coded list.
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
     todo!()
 }
 /// Sort feature names in the order in which they will be traversed.
-/// 
+///
 /// The traversal order is defined by flattening the `pdb_statistics_names`
 /// and filtering out names that do not appear in `feature_names`.
-/// 
+///
 /// If a feature name is not in the `pdb_statistics_names`,
 /// it is ommitted from the returned slice.
-fn sort_feature_names<'a, 'b>(feature_names: &'a mut [&'b str], pdb_statistics_names: &[(&str, &str)]) -> &'a mut [&'b str] {
+fn sort_feature_names<'a, 'b>(
+    feature_names: &'a mut [&'b str],
+    pdb_statistics_names: &[(&str, &str)],
+) -> &'a mut [&'b str] {
     let mut num_not_present = 0;
     for name in feature_names.iter_mut() {
-        if pdb_statistics_names.iter().find(|(sr_name, lr_name)| name == sr_name || name == lr_name).is_none() {
+        if pdb_statistics_names
+            .iter()
+            .find(|(sr_name, lr_name)| name == sr_name || name == lr_name)
+            .is_none()
+        {
             num_not_present += 1;
         }
     }
     // The feature names slice is like 8 long, so `8 x log(8) x pdb_statistics_names.len()` time seems ok.
     feature_names.sort_by_key(|name| {
-        match pdb_statistics_names.iter().enumerate().find(|(_, (sr_name, lr_name))| name == sr_name || name == lr_name) {
+        match pdb_statistics_names
+            .iter()
+            .enumerate()
+            .find(|(_, (sr_name, lr_name))| name == sr_name || name == lr_name)
+        {
             Some((slot, (sr_name, _))) => {
                 if sr_name == name {
                     (slot, 0)
                 } else {
                     (slot, 1)
                 }
-            },
-            None => {
-                (usize::MAX, 0)
             }
+            None => (usize::MAX, 0),
         }
     });
     let len = feature_names.len() - num_not_present;
@@ -124,25 +148,27 @@ fn sort_feature_names<'a, 'b>(feature_names: &'a mut [&'b str], pdb_statistics_n
 }
 /// Load PDB statistics that help compute [`seqs_to_grids`],
 /// and the names of the long and short range statistics.
-/// 
+///
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the `GridScore` class instances in the
 /// standalone LLPhyScore executable found in Julie Forman-Kay's
 /// lab's [python package], written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_named_pdb_statistics<'a>(arena: &'a Bump) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer<'a>>) {
+fn load_named_pdb_statistics<'a>(
+    arena: &'a Bump,
+) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer<'a>>) {
     todo!()
 }
 
 /// Load a "post-processor" (see [`PostProcessor`]).
-/// 
+///
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the `human_g2w_scores` and
 /// `g2w_means_stds_human` dictionaries in the standalone
 /// LLPhyScore executable found in Julie Forman-Kay's
 /// lab's [python package], written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_post_processor<'a>(score_type: ScoreType, arena: &'a Bump) -> PostProcessor<'a> {
     match score_type {
@@ -160,7 +186,7 @@ fn load_post_processor<'a>(score_type: ScoreType, arena: &'a Bump) -> PostProces
     }
 }
 /// Helper for [`load_post_processor`].
-/// 
+///
 /// Load a reference dataset of biophysical feature scores
 /// (currently [`G2WScores`]) that corresponds to the human
 /// proteome or a PDB-derived dataset.
@@ -170,13 +196,13 @@ fn load_reference_g2w_scores(arena: &Bump) -> Vec<'_, G2WScores<'_>> {
 
 /// Load the ML model that converts residue-level feature grids
 /// into sequence-level biophysical feature values in [`get_g2w_scores`].
-/// 
+///
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the global `final_models` dictionary
 /// in the standalone LLPhyScore executable found in Julie
 /// Forman-Kay's lab's [python package], written by Hao Cai
 /// (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
     todo!()
@@ -184,7 +210,7 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 
 /// Given sequences and PDB statistics (currently `&[GridScorer]`),
 /// compute a sequence x feature grid of biophysical scores.
-/// 
+///
 /// May waste some time computing short-range / long-range features
 /// even though they are not used later. Will fix someday!
 ///
@@ -192,7 +218,7 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 /// function in the standalone LLPhyScore executable
 /// found in Julie Forman-Kay's lab's [python package],
 /// written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn seqs_to_grids<'a>(
     sequences: &[FastaEntry<'_>],
@@ -204,8 +230,12 @@ fn seqs_to_grids<'a>(
     let mut grids = Vec::with_capacity_in(sequences.len(), arena);
     for entry in sequences {
         let mut feature_grid = Vec::with_capacity_in(pdb_statistics_scorer.len(), arena);
-        for ((sr_name, lr_name), grid_scorer) in pdb_statistics_names.iter().zip(pdb_statistics_scorer) {
-            if feature_names_requested.contains(sr_name) || feature_names_requested.contains(lr_name) {
+        for ((sr_name, lr_name), grid_scorer) in
+            pdb_statistics_names.iter().zip(pdb_statistics_scorer)
+        {
+            if feature_names_requested.contains(sr_name)
+                || feature_names_requested.contains(lr_name)
+            {
                 let grid_row = grid_scorer.score_sequence(entry.sequence, arena);
                 feature_grid.push(grid_row);
             } else {
@@ -240,7 +270,7 @@ pub struct G2WScores<'a> {
 /// function in the standalone LLPhyScore executable
 /// found in Julie Forman-Kay's lab's [python package],
 /// written by Hao Cai (@haocai1992).
-/// 
+///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn get_g2w_scores<'a>(
     grids: &[&[FeatureGrid<'_>]],
@@ -253,13 +283,15 @@ fn get_g2w_scores<'a>(
     for grid in grids {
         debug_assert_eq!(model.len(), grid.len());
         let mut subfeatures = Vec::with_capacity_in(model.len() * 2, arena);
-        for (((sr_name, lr_name),subfeature), grid_row) in pdb_statistics_names.iter().zip(model).zip(*grid) {
+        for (((sr_name, lr_name), subfeature), grid_row) in
+            pdb_statistics_names.iter().zip(model).zip(*grid)
+        {
             if feature_names_requested.contains(sr_name) {
-                let sr_feat= subfeature.get_g2w_score_for_subfeature::<true>(grid_row);
+                let sr_feat = subfeature.get_g2w_score_for_subfeature::<true>(grid_row);
                 subfeatures.push(sr_feat as f64);
             }
             if feature_names_requested.contains(lr_name) {
-                let lr_feat= subfeature.get_g2w_score_for_subfeature::<false>(grid_row);
+                let lr_feat = subfeature.get_g2w_score_for_subfeature::<false>(grid_row);
                 subfeatures.push(lr_feat as f64);
             }
         }
@@ -296,7 +328,7 @@ fn write_output(
         Some(path) => {
             file_writer = csv::Writer::from_path(path)?;
             write_row = arena.alloc(|row| file_writer.write_record(row))
-        },
+        }
         None => {
             stdout_writer = csv::Writer::from_writer(stdout().lock());
             write_row = arena.alloc(|row| stdout_writer.write_record(row))
@@ -307,8 +339,7 @@ fn write_output(
         (0..feature_names.len() + 1).map(|_| bumpalo::format!(in arena, "{}", 2.0_f64.sqrt())),
         arena,
     ));
-    let feature_sum_column_name =
-        bumpalo::format!(in arena, "{}-feature sum", feature_names.len());
+    let feature_sum_column_name = bumpalo::format!(in arena, "{}-feature sum", feature_names.len());
     column_buffer.push("tag");
     column_buffer.extend_from_slice(feature_names);
     column_buffer.push(unsafe { &*(&*feature_sum_column_name as *const str) });
