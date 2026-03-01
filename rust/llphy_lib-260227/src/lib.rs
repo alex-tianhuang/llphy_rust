@@ -131,7 +131,7 @@ fn sort_feature_names<'a, 'b>(feature_names: &'a mut [&'b str], pdb_statistics_n
 /// lab's [python package], written by Hao Cai (@haocai1992).
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_named_pdb_statistics<'a>(arena: &'a Bump) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer>) {
+fn load_named_pdb_statistics<'a>(arena: &'a Bump) -> (Vec<'a, (&'a str, &'a str)>, Vec<'a, GridScorer<'a>>) {
     todo!()
 }
 
