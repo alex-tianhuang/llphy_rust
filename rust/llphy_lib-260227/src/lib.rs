@@ -11,7 +11,7 @@ use std::{
 mod io;
 use crate::{
     datatypes::{
-        FastaEntry, GridScorer, LLPhyFeature, PostProcessor, FeatureGrid, ScoreType,
+        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, PostProcessor, ScoreType
     },
     fasta::read_fasta,
 };
@@ -71,7 +71,7 @@ pub fn bin_main(args: Args) -> Result<(), Error> {
     let post_processor = load_post_processor(score_type, &arena);
     let model = leak_vec(load_llphy_model(&arena));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
-    let grids = leak_vec(seqs_to_grids(sequences, pdb_statistics_scorer, &arena));
+    let grids = leak_vec(seqs_to_grids(sequences, pdb_statistics_scorer,pdb_statistics_names, feature_names, &arena));
     let output_scores = leak_vec(get_g2w_scores(grids, model, pdb_statistics_names, feature_names, &arena));
     post_process(post_processor, output_scores);
     write_output(output_file, output_scores, sequences, feature_names, &arena)?;
@@ -136,8 +136,6 @@ fn load_named_pdb_statistics<'a>(arena: &'a Bump) -> (Vec<'a, (&'a str, &'a str)
 }
 
 /// Load a "post-processor" (see [`PostProcessor`]).
-/// `feature_names` should be used to determine the order of
-/// features returned. 
 /// 
 /// At the moment, this replaces all of the global state logic
 /// involved in setting up the `human_g2w_scores` and
@@ -186,6 +184,9 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 
 /// Given sequences and PDB statistics (currently `&[GridScorer]`),
 /// compute a sequence x feature grid of biophysical scores.
+/// 
+/// May waste some time computing short-range / long-range features
+/// even though they are not used later. Will fix someday!
 ///
 /// This function is based on the `seqs2grids`
 /// function in the standalone LLPhyScore executable
@@ -196,14 +197,20 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 fn seqs_to_grids<'a>(
     sequences: &[FastaEntry<'_>],
     pdb_statistics_scorer: &[GridScorer],
+    pdb_statistics_names: &[(&str, &str)],
+    feature_names_requested: &[&str],
     arena: &'a Bump,
 ) -> Vec<'a, &'a [FeatureGrid<'a>]> {
     let mut grids = Vec::with_capacity_in(sequences.len(), arena);
     for entry in sequences {
         let mut feature_grid = Vec::with_capacity_in(pdb_statistics_scorer.len(), arena);
-        for grid_scorer in pdb_statistics_scorer {
-            let res_scores = grid_scorer.score_sequence(entry.sequence, arena);
-            feature_grid.push(res_scores);
+        for ((sr_name, lr_name), grid_scorer) in pdb_statistics_names.iter().zip(pdb_statistics_scorer) {
+            if feature_names_requested.contains(sr_name) || feature_names_requested.contains(lr_name) {
+                let grid_row = grid_scorer.score_sequence(entry.sequence, arena);
+                feature_grid.push(grid_row);
+            } else {
+                feature_grid.push(AAMap::default())
+            }
         }
         grids.push(leak_vec(feature_grid) as &[_]);
     }
