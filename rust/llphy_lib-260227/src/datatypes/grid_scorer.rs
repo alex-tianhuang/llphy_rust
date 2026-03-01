@@ -17,6 +17,8 @@ pub struct ResScoresEntryOld {
     pub sr: f64,
     pub lr: f64,
 }
+#[derive(Clone, Copy)]
+struct LineKey(f64);
 impl GridScoreOld {
     pub fn score_sequence_to_res_scores<'a>(
         &self,
@@ -146,8 +148,8 @@ impl GridScoreOld {
         &self,
         mid_res: Aminoacid,
         xmer: usize,
-        sr_linekey: f64,
-        lr_linekey: f64,
+        sr_linekey: LineKey,
+        lr_linekey: LineKey,
     ) -> Option<(f64, f64, f64)> {
         todo!()
     }
@@ -155,12 +157,12 @@ impl GridScoreOld {
         &self,
         mid_res: Aminoacid,
         xmer: usize,
-        sr_linekey: f64,
-        lr_linekey: f64,
+        sr_linekey: LineKey,
+        lr_linekey: LineKey,
     ) -> (f64, f64, f64) {
         todo!()
     }
 }
-fn make_linekey(zscore: f64) -> f64 {
-    ((zscore / 2.0).round() * 2.0).clamp(-8.0, 12.0)
+fn make_linekey(zscore: f64) -> LineKey {
+    LineKey(((zscore / 2.0).round() * 2.0).clamp(-8.0, 12.0))
 }
