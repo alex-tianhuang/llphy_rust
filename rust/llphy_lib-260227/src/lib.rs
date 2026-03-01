@@ -25,6 +25,7 @@ use clap::Parser;
 mod datatypes;
 mod fasta;
 use indicatif::{self, ProgressBar};
+use pyo3::{Bound, FromPyObject, PyResult, prelude::pymodule, pyfunction, types::{PyModule, PyModuleMethods}, wrap_pyfunction};
 
 /// Program that computes phase separation propensity and related
 /// biophysical features of sequences from a given input file.
@@ -33,7 +34,7 @@ use indicatif::{self, ProgressBar};
 /// written by Hao Cai (@haocai1992).
 ///
 /// [python library]: https://github.com/julie-forman-kay-lab/LLPhyScore
-#[derive(Parser)]
+#[derive(Parser, FromPyObject)]
 #[clap(verbatim_doc_comment, name = "llphyscore")]
 pub struct Args {
     /// Input file, in FASTA format.
@@ -45,6 +46,11 @@ pub struct Args {
     /// The type of score to output.
     #[arg(short, long, default_value = "percentile", value_enum)]
     score_type: ScoreType,
+}
+#[pymodule]
+fn llphyscore(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(bin_main, m)?)?;
+    Ok(())
 }
 /// Main method for the binary.
 ///
@@ -64,7 +70,8 @@ pub struct Args {
 /// --
 /// This function calls [`read_fasta`] and [`seqs_to_grids`],
 /// which both touch the stderr output. It also prints one message to stderr.
-pub fn bin_main(args: Args) -> Result<(), Error> {
+#[pyfunction(name = "run_fasta_scorer")]
+fn bin_main(args: Args) -> Result<(), Error> {
     let Args {
         input_file,
         output_file,

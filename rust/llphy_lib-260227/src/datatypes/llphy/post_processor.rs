@@ -3,8 +3,10 @@
 //! 
 //! See [`ScoreType`] and [`PostProcessor`].
 use crate::{G2WScores, leak_vec};
+use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
 use clap::ValueEnum;
+use pyo3::FromPyObject;
 
 /// The type of score to return.
 #[derive(Clone, ValueEnum)]
@@ -16,7 +18,13 @@ pub enum ScoreType {
     ZScore,
     /// Report values in as percentiles compared to a reference proteome.
     Percentile,
-    
+}
+impl<'a, 'py> FromPyObject<'a, 'py> for ScoreType {
+    type Error = Error;
+    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
+        let s = obj.extract()?;
+        Ok(ScoreType::from_str(s, false).map_err(Error::msg)?)
+    }
 }
 /// A data struct derived from a reference dataset of
 /// phase separation positive/negative proteins.

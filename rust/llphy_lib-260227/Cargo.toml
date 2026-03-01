@@ -3,6 +3,10 @@ name = "llphyscore"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "llphyscore"
+crate-type = ["cdylib"]
+
 [dependencies]
 anyhow = "1.0.102"
 bumpalo = { version = "3.20.2", features = ["collections"] }
@@ -10,4 +14,5 @@ bytesize = "2.3.1"
 clap = { version = "4.5.60", features = ["derive"] }
 csv = "1.4.0"
 indicatif = "0.18.4"
+pyo3 = { version = "0.28.2", features = ["anyhow", "extension-module"] }
 thiserror = "2.0.18"
