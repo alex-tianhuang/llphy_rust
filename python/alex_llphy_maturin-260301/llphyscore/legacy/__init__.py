@@ -1,5 +1,4 @@
 import sys
-import traceback
 AMINOACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 def load_named_pdb_statistics(dbpath: str, max_xmer: int):
