@@ -25,7 +25,13 @@ use clap::Parser;
 mod datatypes;
 mod fasta;
 use indicatif::{self, ProgressBar};
-use pyo3::{Bound, FromPyObject, PyResult, prelude::pymodule, pyfunction, types::{PyModule, PyModuleMethods}, wrap_pyfunction};
+use pyo3::{
+    Bound, FromPyObject, PyResult,
+    prelude::pymodule,
+    pyfunction,
+    types::{PyModule, PyModuleMethods},
+    wrap_pyfunction,
+};
 
 /// Program that computes phase separation propensity and related
 /// biophysical features of sequences from a given input file.
@@ -47,8 +53,8 @@ pub struct Args {
     #[arg(short, long, default_value = "percentile", value_enum)]
     score_type: ScoreType,
 }
-#[pymodule]
-fn llphyscore(m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pymodule(name = "_rust")]
+fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bin_main, m)?)?;
     Ok(())
 }
