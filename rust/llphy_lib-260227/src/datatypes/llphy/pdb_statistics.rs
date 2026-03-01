@@ -8,9 +8,12 @@ use crate::{
 use bumpalo::{Bump, collections::Vec};
 use std::{array, cmp::{self, Ordering}};
 /// The minimum residue separation that we have collected residue statistics for.
+/// 
+/// There are a bunch of assumptions in other code that rely on this number
+/// being `1`, so probably it will never ever change.
 const MIN_XMER: usize = 1;
 /// The maximum residue separation that we have collected residue statistics for.
-const MAX_XMER: usize = 40;
+pub(crate) const MAX_XMER: usize = 40;
 /// Struct that uses PDB-statistics to
 /// convert sequences to feature grids.
 /// 
