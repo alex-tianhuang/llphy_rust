@@ -1,7 +1,6 @@
 /// A fork of my other project's aminoacid/sequence related definitions,
 /// except for [`FastaEntry`] which I made for this project.
 mod aamap;
-mod aaset;
 mod aastring;
 mod aminoacid;
 pub use aamap::{

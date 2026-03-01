@@ -14,7 +14,6 @@ use generic::AALike;
 /// Borrowed `str` analogue for [`Aminoacid`] strings.
 #[allow(non_camel_case_types)]
 pub type aa_canonical_str = generic::aa_str<Aminoacid>;
-/// Owned `String` analogue for [`Aminoacid`] strings.
 unsafe impl AALike for Aminoacid {
     const DESCRIBE: &'static str = "single-letter aminoacid character";
 }

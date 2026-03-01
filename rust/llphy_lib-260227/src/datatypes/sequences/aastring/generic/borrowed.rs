@@ -1,6 +1,5 @@
 //! Module defining a generic borrowed aminoacid string, [`aa_str`].
 use crate::datatypes::sequences::aastring::generic::AALike;
-// use serde::Serialize;
 use std::{
     marker::PhantomData,
     ops::{Index, Range, RangeFrom, RangeTo},
@@ -95,14 +94,6 @@ impl<'a, A: AALike> IntoIterator for &'a aa_str<A> {
     }
 }
 
-// impl<A: AALike> Serialize for aa_str<A> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         self.as_str().serialize(serializer)
-//     }
-// }
 /// Error returned when converting bytes to an [`aa_str`].
 #[derive(Debug, Error)]
 #[error("expected string of {}s, but found `{ch}` at index {at}", A::DESCRIBE)]

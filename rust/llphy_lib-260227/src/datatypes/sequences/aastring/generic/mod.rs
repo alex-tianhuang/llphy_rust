@@ -1,7 +1,10 @@
-//! Module defining some generic "aminoacid string" datatypes,
-//! which are just wrappers around slices that can be cast safely to strings.
+//! Module defining a generic "aminoacid string" datatype ([`aa_str`]),
+//! which is just a wrapper around slices that can be cast safely to strings.
 //! 
-//! See [`aa_str`] and [`AAString`].
+//! The reason this is so complicated just to represent aminoacid strings
+//! is because this module comes from a larger codebase where there are
+//! actually multiple aminoacid variants and so it is useful to have a
+//! generic `aa_str`.
 use std::fmt::Debug;
 mod borrowed;
 // mod owned;
