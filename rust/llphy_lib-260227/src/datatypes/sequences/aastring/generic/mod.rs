@@ -4,7 +4,7 @@
 //! See [`aa_str`] and [`AAString`].
 use std::fmt::Debug;
 mod borrowed;
-mod owned;
+// mod owned;
 pub use borrowed::{aa_str};
 /// A one-byte datatype that is representable by a subset
 /// (single-byte, not arbitrary chars) of displayable characters.
