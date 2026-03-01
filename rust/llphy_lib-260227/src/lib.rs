@@ -11,7 +11,7 @@ use std::{
 mod io;
 use crate::{
     datatypes::{
-        FastaEntry, GridScorer, LLPhyFeatureOld, PostProcessor, FeatureGrid, ScoreType,
+        FastaEntry, GridScorer, LLPhyFeature, PostProcessor, FeatureGrid, ScoreType,
     },
     fasta::read_fasta,
 };
@@ -148,7 +148,7 @@ fn load_reference_g2w_scores(arena: &Bump) -> Vec<'_, G2WScores<'_>> {
 /// (@haocai1992).
 /// 
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_llphy_model<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, LLPhyFeatureOld> {
+fn load_llphy_model<'a>(feature_names: &[&str], arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
     todo!()
 }
 
@@ -205,7 +205,7 @@ pub struct G2WScores<'a> {
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn get_g2w_scores<'a>(
     grids: &[&[FeatureGrid<'_>]],
-    model: &[LLPhyFeatureOld],
+    model: &[LLPhyFeature],
     arena: &'a Bump,
 ) -> Vec<'a, G2WScores<'a>> {
     let mut scores = Vec::with_capacity_in(grids.len(), arena);
