@@ -10,7 +10,7 @@ use std::{
     fs::File,
     io::{StdoutLock, stdout},
     mem::{self, ManuallyDrop},
-    path::PathBuf
+    path::PathBuf,
 };
 mod io;
 use crate::{
@@ -59,7 +59,7 @@ pub struct Args {
 /// written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-/// 
+///
 /// IO
 /// --
 /// This function calls [`read_fasta`] and [`seqs_to_grids`],
@@ -227,7 +227,7 @@ fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
 /// written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-/// 
+///
 /// IO
 /// --
 /// If `PBAR` is true, this function
@@ -240,18 +240,31 @@ fn seqs_to_grids<'a, const PBAR: bool>(
     feature_names_requested: &[&str],
     arena: &'a Bump,
 ) -> Vec<'a, &'a mut [FeatureGrid<'a>]> {
-    let mut grids = Vec::from_iter_in((0..sequences.len()).map(|_| {
-        leak_vec(Vec::from_iter_in((0..pdb_statistics_scorer.len()).map(|_| AAMap::default()), arena))
-    }), arena);
-    for (idx, ((grid_name, [sr_name, lr_name]), grid_scorer)) in
-        pdb_statistics_names.iter().zip(pdb_statistics_scorer).enumerate()
+    let num_grids = pdb_statistics_names
+        .iter()
+        .filter(|(_, [sr_name, lr_name])| {
+            feature_names_requested.contains(sr_name) || feature_names_requested.contains(lr_name)
+        })
+        .count();
+    let mut grids = Vec::from_iter_in(
+        (0..sequences.len()).map(|_| {
+            leak_vec(Vec::from_iter_in(
+                (0..num_grids).map(|_| AAMap::default()),
+                arena,
+            ))
+        }),
+        arena,
+    );
+    let mut idx = 0;
+    for ((grid_name, [sr_name, lr_name]), grid_scorer) in
+        pdb_statistics_names.iter().zip(pdb_statistics_scorer)
     {
-        if feature_names_requested.contains(sr_name)
-            || feature_names_requested.contains(lr_name)
-        {
+        if feature_names_requested.contains(sr_name) || feature_names_requested.contains(lr_name) {
             if PBAR {
                 let pbar = ProgressBar::new(sequences.len() as _);
-                pbar.println(bumpalo::format!(in arena, "CONVERTING SEQUENCES TO {} GRIDS", grid_name));
+                pbar.println(
+                    bumpalo::format!(in arena, "CONVERTING SEQUENCES TO {} GRIDS", grid_name),
+                );
                 for (grid_row, entry) in grids.iter_mut().zip(sequences) {
                     grid_row[idx] = grid_scorer.score_sequence(entry.sequence, arena);
                     pbar.inc(1);
@@ -262,7 +275,8 @@ fn seqs_to_grids<'a, const PBAR: bool>(
                     grid_row[idx] = grid_scorer.score_sequence(entry.sequence, arena);
                 }
             }
-        } 
+            idx += 1;
+        }
     }
     grids
 }
@@ -303,15 +317,19 @@ fn get_g2w_scores<'a>(
     for grid in grids {
         debug_assert_eq!(model.len(), grid.len());
         let mut subfeatures = Vec::with_capacity_in(model.len() * 2, arena);
-        for (((_, [sr_name, lr_name]), subfeature), grid_row) in
-            pdb_statistics_names.iter().zip(model).zip(*grid as &[_])
-        {
+        let mut grid_iter = grid.iter();
+        for ((_, [sr_name, lr_name]), subfeature) in pdb_statistics_names.iter().zip(model) {
+            let mut grid_row = None;
             if feature_names_requested.contains(sr_name) {
-                let sr_feat = subfeature.get_g2w_score_for_subfeature::<true>(grid_row);
+                let sr_feat = subfeature.get_g2w_score_for_subfeature::<true>(
+                    grid_row.get_or_insert_with(|| grid_iter.next().unwrap()),
+                );
                 subfeatures.push(sr_feat as f64);
             }
             if feature_names_requested.contains(lr_name) {
-                let lr_feat = subfeature.get_g2w_score_for_subfeature::<false>(grid_row);
+                let lr_feat = subfeature.get_g2w_score_for_subfeature::<false>(
+                    grid_row.get_or_insert_with(|| grid_iter.next().unwrap()),
+                );
                 subfeatures.push(lr_feat as f64);
             }
         }
