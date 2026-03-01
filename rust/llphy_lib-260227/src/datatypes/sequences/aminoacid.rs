@@ -1,5 +1,11 @@
 //! Module defining the [`Aminoacid`] enum.
-use std::mem;
+use anyhow::Error;
+use pyo3::{
+    FromPyObject, PyErr,
+    exceptions::PyValueError,
+    types::{PyAnyMethods, PyString, PyStringMethods},
+};
+use std::{borrow::Cow, mem};
 use thiserror::Error;
 
 /// Macro that defines the [`Aminoacid`] enum
@@ -109,28 +115,35 @@ macro_rules! derive_aa_as_char_impls {
                 std::fmt::Display::fmt(&(u8::from(*self) as char), f)
             }
         }
-        // impl<'de> serde::Deserialize<'de> for $aa_like {
-        //     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        //     where
-        //         D: serde::Deserializer<'de>,
-        //     {
-        //         let ch = <char as serde::Deserialize>::deserialize(deserializer)?;
-        //         <$aa_like>::try_from(ch).map_err(serde::de::Error::custom)
-        //     }
-        // }
-        // impl serde::Serialize for $aa_like {
-        //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        //     where
-        //         S: serde::Serializer,
-        //     {
-        //         <char as serde::Serialize>::serialize(&(u8::from(*self) as char), serializer)
-        //     }
-        // }
     };
 }
 impl From<Aminoacid> for u8 {
     fn from(value: Aminoacid) -> Self {
         value as u8
+    }
+}
+impl<'a, 'py> FromPyObject<'a, 'py> for Aminoacid {
+    type Error = PyErr;
+    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
+        let s = obj.cast::<PyString>()?;
+        if s.len()? != 1 {
+            return Err(PyValueError::new_err("expected a string of length 1"));
+        }
+        match s.to_cow()? {
+            Cow::Borrowed(s) => {
+                let [b] = *s.as_bytes() else {
+                    return Err(PyValueError::new_err(format!(
+                        "expected aminoacid, got unknown string: {}",
+                        s
+                    )))
+                };
+                Ok(Aminoacid::try_from(b).map_err(Error::new)?)
+            }
+            Cow::Owned(s) => Err(PyValueError::new_err(format!(
+                "expected aminoacid, got unknown string: {}",
+                s
+            ))),
+        }
     }
 }
 derive_aa_as_char_impls!(Aminoacid);

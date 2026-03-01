@@ -6,7 +6,7 @@ use crate::{G2WScores, leak_vec};
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
 use clap::ValueEnum;
-use pyo3::FromPyObject;
+use pyo3::{PyErr, FromPyObject};
 
 /// The type of score to return.
 #[derive(Clone, ValueEnum)]
@@ -20,7 +20,7 @@ pub enum ScoreType {
     Percentile,
 }
 impl<'a, 'py> FromPyObject<'a, 'py> for ScoreType {
-    type Error = Error;
+    type Error = PyErr;
     fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
         let s = obj.extract()?;
         Ok(ScoreType::from_str(s, false).map_err(Error::msg)?)
