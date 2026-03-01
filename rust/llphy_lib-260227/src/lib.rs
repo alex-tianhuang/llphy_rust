@@ -170,7 +170,7 @@ fn seqs_to_grids<'a>(
     for entry in sequences {
         let mut feature_grid = Vec::with_capacity_in(pdb_statistics.len(), arena);
         for grid_scorer in pdb_statistics {
-            let res_scores = grid_scorer.score_sequence_to_res_scores(entry.sequence, arena);
+            let res_scores = grid_scorer.score_sequence(entry.sequence, arena);
             feature_grid.push(res_scores);
         }
         grids.push(leak_vec(feature_grid) as &[_]);
