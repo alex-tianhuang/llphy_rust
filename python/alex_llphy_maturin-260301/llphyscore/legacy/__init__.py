@@ -1,9 +1,8 @@
 import sys
+import traceback
 AMINOACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 def load_named_pdb_statistics(dbpath: str, max_xmer: int):
-    from argparse import Namespace
-
     feature_tagABs = {
         "S2.SUMPI": ["srpipi", "lrpipi"],
         "S3.WATER.V2": ["Water", "Carbon"],
@@ -17,35 +16,40 @@ def load_named_pdb_statistics(dbpath: str, max_xmer: int):
         "S9.LARKS.V2": ["larkSIM", "larkFAR"],
     }
     pdb_statistics_names: "list[tuple[str, tuple[str, str]]]" = []
-    pdb_statistics: "list[Namespace]" = []
+    pdb_statistics = []
     with Warner(10) as warner:
         for grid_name, (tag_sr, tag_lr) in feature_tagABs.items():
-            grid_scorer = Namespace()
-            subdir = f"{dbpath}/{grid_name}"
-            filepath = f"{subdir}/PCON2.FREQS.wBOOTDEV"
-            try:
-                grid_scorer.pair_freq_db_x, grid_scorer.pair_freq_db_y = load_pair_freq_db(
-                    filepath, tag_sr, tag_lr, warner
-                )
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                raise RuntimeError(
-                    "failed to load frequency pair DB @ {}".format(filepath)
-                ) from e
-            filepath = f"{subdir}/STEP6_PICKLES/SC_GRIDS.pickle4"
-            try:
-                grid_scorer.z_grid_db = load_z_grid_db(filepath)
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                raise RuntimeError("failed to load Z grid DB @ {}".format(filepath)) from e
-            xmer_dir = f"{subdir}/STEP4_AVGnSDEVS"
-            grid_scorer.avg_sdev_db = load_avg_sdev_db(xmer_dir, max_xmer)
+            grid_scorer = load_grid_scorer(dbpath, grid_name, tag_sr, tag_lr, max_xmer, warner)
             pdb_statistics_names.append((grid_name, (tag_sr, tag_lr)))
             pdb_statistics.append(grid_scorer)
     return pdb_statistics_names, pdb_statistics
 
+def load_grid_scorer(dbpath: str, grid_name: str, tag_sr: str, tag_lr: str, max_xmer: int, warner: "Warner"):
+    from argparse import Namespace
+
+    grid_scorer = Namespace()
+    subdir = f"{dbpath}/{grid_name}"
+    filepath = f"{subdir}/PCON2.FREQS.wBOOTDEV"
+    try:
+        grid_scorer.pair_freq_db_x, grid_scorer.pair_freq_db_y = load_pair_freq_db(
+            filepath, tag_sr, tag_lr, warner
+        )
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        raise RuntimeError(
+            "failed to load frequency pair DB @ {}".format(filepath)
+        ) from e
+    filepath = f"{subdir}/STEP6_PICKLES/SC_GRIDS.pickle4"
+    try:
+        grid_scorer.z_grid_db = load_z_grid_db(filepath)
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        raise RuntimeError("failed to load Z grid DB @ {}".format(filepath)) from e
+    xmer_dir = f"{subdir}/STEP4_AVGnSDEVS"
+    grid_scorer.avg_sdev_db = load_avg_sdev_db(xmer_dir, max_xmer)
+    return grid_scorer
 
 class Warner:
     limit: int
@@ -72,7 +76,7 @@ class Warner:
         if self.warn_count > self.limit:
             suppressed_count = self.warn_count - self.limit
             print(
-                f"{suppressed_count} more messages like the above suppressed",
+                f"...\n{suppressed_count} other messages suppressed",
                 file=sys.stderr,
             )
 
@@ -84,7 +88,6 @@ def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, warner: Warner):
     intermediate_y: "dict[int, dict[str, dict[str, list[tuple[float, float]]]]]" = {}
     with open(filepath) as file:
         for line in file:
-
             def assert_true(b):
                 if not b:
                     raise RuntimeError("failed to parse line: {}".format(line))
@@ -123,8 +126,9 @@ def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, warner: Warner):
                     second_aa = aa_x
                     tag = ptype.removeprefix("Y_")
                 # assert_true((sr := tag == tag_sr) or tag == tag_lr)
-                if not (sr := tag == tag_sr) or tag == tag_lr:
-                    warner.warn(f"ignoring line with unrecognized {tag = }: {line}")
+                if not ((sr := tag == tag_sr) or tag == tag_lr):
+                    available_tags = [tag_sr, tag_lr]
+                    warner.warn(f"ignoring line with unrecognized {tag = } ({available_tags = }): {line}")
                 if (entry1 := target.get(separation)) is None:
                     target[separation] = entry1 = {}
                 if (entry2 := entry1.get(first_aa)) is None:
