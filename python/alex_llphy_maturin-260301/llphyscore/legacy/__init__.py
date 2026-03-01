@@ -32,7 +32,7 @@ def load_grid_scorer(dbpath: str, grid_name: str, tag_sr: str, tag_lr: str, max_
     filepath = f"{subdir}/PCON2.FREQS.wBOOTDEV"
     try:
         grid_scorer.pair_freq_db_x, grid_scorer.pair_freq_db_y = load_pair_freq_db(
-            filepath, tag_sr, tag_lr, warner
+            filepath, tag_sr, tag_lr, max_xmer, warner
         )
     except KeyboardInterrupt:
         raise
@@ -42,7 +42,7 @@ def load_grid_scorer(dbpath: str, grid_name: str, tag_sr: str, tag_lr: str, max_
         ) from e
     filepath = f"{subdir}/STEP6_PICKLES/SC_GRIDS.pickle4"
     try:
-        grid_scorer.z_grid_db = load_z_grid_db(filepath)
+        grid_scorer.z_grid_db = load_z_grid_db(filepath, max_xmer)
     except KeyboardInterrupt:
         raise
     except Exception as e:
@@ -81,7 +81,7 @@ class Warner:
             )
 
 
-def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, warner: Warner):
+def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, max_xmer: int, warner: Warner):
     import math
 
     intermediate_x: "dict[int, dict[str, dict[str, list[tuple[float, float]]]]]" = {}
@@ -148,7 +148,7 @@ def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, warner: Warner):
         (pair_freq_db_x, intermediate_x),
         (pair_freq_db_y, intermediate_y),
     ):
-        for i in range(len(intermediate)):
+        for i in range(max_xmer):
             separation = i + 1
             if (entry1 := intermediate.get(separation)) is None:
                 x = len(pair_freq_db_x) == 0
@@ -168,7 +168,7 @@ def load_pair_freq_db(filepath: str, tag_sr: str, tag_lr: str, warner: Warner):
     return pair_freq_db_x, pair_freq_db_y
 
 
-def load_z_grid_db(filepath: str):
+def load_z_grid_db(filepath: str, max_xmer: int):
     import pickle
 
     with open(filepath, "rb") as file:
@@ -208,7 +208,7 @@ def load_z_grid_db(filepath: str):
                 lambda: "found a non-positive integer: {}".format(xmer),
             )
             assert_true(
-                xmer <= len(entry1),
+                xmer <= max_xmer,
                 "dense mapping for all possible residue separations",
                 lambda: "unexpectedly high `xmer`: {}".format(xmer),
             )
