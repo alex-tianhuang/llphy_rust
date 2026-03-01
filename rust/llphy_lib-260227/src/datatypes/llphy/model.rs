@@ -1,6 +1,6 @@
 //! Module defining structs to map residue-level feature grids to
 //! sequence-level features (currently via [`LLPhyFeature`]).
-use crate::datatypes::{AAMap, FeatureGrid, FeatureGridEntry};
+use crate::datatypes::{AAMap, FeatureGridEntry};
 
 /// Thresholds and signs for mapping short-range
 /// and long-range feature-grids to sequence-level feature values.
