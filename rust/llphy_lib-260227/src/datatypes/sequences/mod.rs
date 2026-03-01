@@ -7,7 +7,7 @@ pub use aamap::{
     AAMap,
 };
 pub(crate) use aastring::aa_canonical_str;
-pub(crate) use aminoacid::{AAIndex, AMINOACIDS, Aminoacid};
+pub(crate) use aminoacid::{AMINOACIDS, Aminoacid};
 
 /// Fasta entry, containing a sequence and header.
 pub struct FastaEntry<'a> {
