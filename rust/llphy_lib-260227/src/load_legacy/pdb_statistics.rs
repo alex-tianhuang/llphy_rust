@@ -1,18 +1,11 @@
-use std::{
-    array,
-    collections::BTreeMap,
-    mem::{ManuallyDrop, MaybeUninit},
-    path::{Path, PathBuf},
-    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
-    str::FromStr,
-};
-
 use anyhow::{Context, Error};
 use bumpalo::{Bump, collections::Vec};
 use serde_pickle::DeOptions;
+use std::{array, collections::BTreeMap, path::Path, str::FromStr};
 
 use crate::{
     datatypes::{AAMap, Aminoacid, GridScorer, LineKey, MAX_XMER},
+    leak_vec,
     load_legacy::read_archive_file,
 };
 
@@ -20,32 +13,31 @@ pub fn load_legacy_pdb_statistics(
     arena: &Bump,
 ) -> Result<
     (
-        &'static [(&'static str, (&'static str, &'static str))],
-        Vec<'_, GridScorer<'_>>,
+        &'static [(&'static str, [&'static str; 2])],
+        &[GridScorer<'_>],
     ),
     Error,
 > {
-    const GRID_NAMES: &'static [(&'static str, (&'static str, &'static str))] = &[
-        ("S2.SUMPI", ("srpipi", "lrpipi")),
-        ("S3.WATER.V2", ("Water", "Carbon")),
+    const GRID_NAMES: &'static [(&'static str, [&'static str; 2])] = &[
+        ("S2.SUMPI", ["srpipi", "lrpipi"]),
+        ("S3.WATER.V2", ["Water", "Carbon"]),
         // "ssL" also in original but seems not intentional
         // "ssH" in database but not in here... yikes...
-        ("S4.SSPRED", ("ssH", "ssE")),
-        ("S5.DISO", ("disL", "disS")),
-        ("S6.CHARGE.V2", ("srELEC", "lrELEC")),
-        ("S7.ELECHB.V2", ("sr_hb", "lr_hb")),
-        ("S8.CationPi.V2", ("srCATPI", "lrCATPI")),
-        ("S9.LARKS.V2", ("larkSIM", "larkFAR")),
+        ("S4.SSPRED", ["ssH", "ssE"]),
+        ("S5.DISO", ["disL", "disS"]),
+        ("S6.CHARGE.V2", ["srELEC", "lrELEC"]),
+        ("S7.ELECHB.V2", ["sr_hb", "lr_hb"]),
+        ("S8.CationPi.V2", ["srCATPI", "lrCATPI"]),
+        ("S9.LARKS.V2", ["larkSIM", "larkFAR"]),
     ];
-    let prefix = Path::new("ScoreDBs");
     let mut pdb_statistics = Vec::with_capacity_in(GRID_NAMES.len(), arena);
     let mut warner = Warner::new(10);
-    for (grid_name, (tag_sr, tag_lr)) in GRID_NAMES.iter().copied() {
-        let subdir = prefix.join(grid_name);
-        let grid_scorer = load_grid_scorer(&subdir, tag_sr, tag_lr, arena, &mut warner)?;
+    for (grid_name, [tag_sr, tag_lr]) in GRID_NAMES.iter().copied() {
+        let grid_scorer =
+            load_grid_scorer(Path::new(grid_name), tag_sr, tag_lr, arena, &mut warner)?;
         pdb_statistics.push(grid_scorer);
     }
-    Ok((GRID_NAMES, pdb_statistics))
+    Ok((GRID_NAMES, leak_vec(pdb_statistics)))
 }
 fn load_grid_scorer<'a>(
     subdir: &Path,
