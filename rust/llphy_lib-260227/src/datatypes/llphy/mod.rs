@@ -1,6 +1,6 @@
 //! LLPhyScore-specific datatypes.
 mod pdb_statistics;
-pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, MAX_XMER};
+pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, MAX_XMER, LineKey};
 mod model;
 pub(crate) use model::LLPhyFeature;
 mod post_processor;

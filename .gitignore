@@ -3,3 +3,4 @@ python/cai_llphyscore-260227/*
 rust/target/*
 python/**/__pycache__/*
 python/**/libllphyscore.dylib.dSYM/*
+.cargo/*

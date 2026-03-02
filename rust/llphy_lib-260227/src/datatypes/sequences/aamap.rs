@@ -1,9 +1,10 @@
 //! Module defining the [`AAMap`] type.
 
+use serde::{Deserialize, de::Visitor};
+
 use crate::datatypes::{AMINOACIDS, Aminoacid};
 use std::{
-    fmt::Debug,
-    ops::{Index, IndexMut},
+    fmt::Debug, marker::PhantomData, ops::{Index, IndexMut}
 };
 
 /// A residue mapping type.
@@ -44,11 +45,21 @@ impl<T> AAMap<T> {
     pub fn iter(&self) -> impl Iterator<Item = (Aminoacid, &T)> {
         AMINOACIDS.into_iter().zip(self.0.iter())
     }
+    /// Iterate over (aa, &mut value) pairs, like a regular map.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Aminoacid, &mut T)> {
+        AMINOACIDS.into_iter().zip(self.0.iter_mut())
+    }
     /// Iterate over values by reference, like a regular map.
     /// The order of the iterator is still the same as the declaration
     /// order of amino acids.
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
+    }
+    /// Iterate over values by mutable reference, like a regular map.
+    /// The order of the iterator is still the same as the declaration
+    /// order of amino acids.
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.0.iter_mut()
     }
 }
 impl<T> Index<Aminoacid> for AAMap<T> {
@@ -82,5 +93,32 @@ impl<T> IntoIterator for AAMap<T> {
 impl<T: Debug> Debug for AAMap<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_map().entries(self.iter()).finish()
+    }
+}
+impl<'de, T: Deserialize<'de> + Default> Deserialize<'de> for AAMap<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct AAMapVisitor<T>(PhantomData<T>);
+        impl<'de, T: Deserialize<'de> + Default> Visitor<'de> for AAMapVisitor<T> {
+            type Value = AAMap<T>;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a map with amino acids as keys")
+            }
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut aamap = AAMap::default();
+                while let Some((ch, value)) = map.next_entry()? {
+                    let ch: char = ch;
+                    let aa = Aminoacid::try_from(ch).map_err(serde::de::Error::custom)?;
+                    aamap[aa] = value
+                }
+                Ok(aamap)
+            }
+        }
+        deserializer.deserialize_map(AAMapVisitor(PhantomData))
     }
 }

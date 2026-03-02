@@ -15,4 +15,6 @@ clap = { version = "4.5.60", features = ["derive"] }
 csv = "1.4.0"
 indicatif = "0.18.4"
 pyo3 = { version = "0.28.2", features = ["anyhow", "extension-module"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde-pickle = "1.2.0"
 thiserror = "2.0.18"

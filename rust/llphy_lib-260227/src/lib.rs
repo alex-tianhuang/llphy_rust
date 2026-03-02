@@ -13,6 +13,7 @@ use std::{
     path::PathBuf,
 };
 mod io;
+mod test_load_legacy_pdb_statistics;
 use crate::{
     datatypes::{
         AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, PostProcessor, ScoreType,
@@ -24,15 +25,11 @@ use bumpalo::{Bump, collections::Vec};
 use clap::Parser;
 mod datatypes;
 mod fasta;
+mod load_legacy;
 use indicatif::{self, ProgressBar};
 use pyo3::{
-    Bound, FromPyObject, PyResult,
-    prelude::pymodule,
-    pyfunction,
-    types::{PyModule, PyModuleMethods},
-    wrap_pyfunction,
+    Bound, FromPyObject, PyResult, prelude::pymodule, pyfunction, types::{PyAnyMethods, PyModule, PyModuleMethods, PyString}, wrap_pyfunction
 };
-
 /// Program that computes phase separation propensity and related
 /// biophysical features of sequences from a given input file.
 ///
@@ -56,6 +53,7 @@ pub struct Args {
 #[pymodule(name = "_rust")]
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bin_main, m)?)?;
+    m.add_function(wrap_pyfunction!(test_load_legacy_pdb_statistics::load_named_pdb_statistics, m)?)?;
     Ok(())
 }
 /// Main method for the binary.
