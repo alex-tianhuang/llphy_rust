@@ -13,12 +13,11 @@ use std::{
     path::PathBuf,
 };
 mod io;
-mod test_load_legacy_pdb_statistics;
 use crate::{
     datatypes::{
-        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, PostProcessor, ScoreType,
+        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, ModelTrainingType, PostProcessor, ScoreType
     },
-    fasta::read_fasta,
+    fasta::read_fasta, load_legacy::{load_legacy_pdb_statistics, load_legacy_reference_g2w_scores},
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
@@ -49,15 +48,16 @@ pub struct Args {
     /// The type of score to output.
     #[arg(short, long, default_value = "percentile", value_enum)]
     score_type: ScoreType,
+    /// The phase separation model to use,
+    /// categorized by the negative set it was trained on.
+    #[arg(short, long, default_value = "human+PDB", value_enum)]
+    model_train_base: ModelTrainingType
 }
 #[pymodule(name = "_rust")]
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(bin_main, m)?)?;
-    m.add_function(wrap_pyfunction!(test_load_legacy_pdb_statistics::load_named_pdb_statistics, m)?)?;
+    m.add_function(wrap_pyfunction!(run_fasta_scorer, m)?)?;
     Ok(())
 }
-/// Main method for the binary.
-///
 /// Loads sequences from `args.input_file`,
 /// computes biophysical feature grids and then
 /// computes the phase separation propensity,
@@ -74,22 +74,21 @@ fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// --
 /// This function calls [`read_fasta`] and [`seqs_to_grids`],
 /// which both touch the stderr output. It also prints one message to stderr.
-#[pyfunction(name = "run_fasta_scorer")]
-fn bin_main(args: Args) -> Result<(), Error> {
+#[pyfunction]
+fn run_fasta_scorer(args: Args) -> Result<(), Error> {
     let Args {
         input_file,
         output_file,
         score_type,
+        model_train_base
     } = args;
     // Everything de-allocates when this does,
     // so no need to de-allocate anything else!
     let arena = Bump::new();
-    let (pdb_statistics_names, pdb_statistics_scorer) = load_named_pdb_statistics(&arena);
-    let pdb_statistics_names = leak_vec(pdb_statistics_names);
-    let pdb_statistics_scorer = leak_vec(pdb_statistics_scorer);
+    let (pdb_statistics_names, pdb_statistics_scorer) = load_named_pdb_statistics(&arena)?;
     let feature_names = leak_vec(load_feature_names(&arena));
     sort_feature_names(feature_names, pdb_statistics_names);
-    let post_processor = load_post_processor(score_type, &arena);
+    let post_processor = load_post_processor(score_type, model_train_base, &arena)?;
     let model = leak_vec(load_llphy_model(&arena));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
     let grids = leak_vec(seqs_to_grids::<true>(
@@ -146,20 +145,18 @@ fn sort_feature_names<'a, 'b>(
     }
     // The feature names slice is like 8 long, so `8 x log(8) x pdb_statistics_names.len()` time seems ok.
     feature_names.sort_by_key(|name| {
-        match pdb_statistics_names
+       pdb_statistics_names
             .iter()
             .enumerate()
             .find(|(_, (_, [sr_name, lr_name]))| name == sr_name || name == lr_name)
-        {
-            Some((slot, (sr_name, _))) => {
+            .map(|(slot, (sr_name, _))| {
                 if sr_name == name {
                     (slot, 0)
                 } else {
                     (slot, 1)
                 }
-            }
-            None => (usize::MAX, 0),
-        }
+            }) 
+            .unwrap_or((usize::MAX, 0))
     });
     let len = feature_names.len() - num_not_present;
     &mut feature_names[..len]
@@ -175,8 +172,8 @@ fn sort_feature_names<'a, 'b>(
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_named_pdb_statistics<'a>(
     arena: &'a Bump,
-) -> (Vec<'a, (&'a str, [&'a str; 2])>, Vec<'a, GridScorer<'a>>) {
-    todo!()
+) -> Result<(&'a [(&'a str, [&'a str; 2])], &'a [GridScorer<'a>]), Error> {
+    load_legacy_pdb_statistics(arena)
 }
 
 /// Load a "post-processor" (see [`PostProcessor`]).
@@ -188,18 +185,18 @@ fn load_named_pdb_statistics<'a>(
 /// lab's [python package], written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_post_processor<'a>(score_type: ScoreType, arena: &'a Bump) -> PostProcessor<'a> {
+fn load_post_processor<'a>(score_type: ScoreType, model_train_base: ModelTrainingType, arena: &'a Bump) -> Result<PostProcessor<'a>, Error> {
     match score_type {
-        ScoreType::Raw => PostProcessor::new_raw(),
+        ScoreType::Raw => Ok(PostProcessor::new_raw()),
         ScoreType::ZScore => {
-            let ref_scores = load_reference_g2w_scores(arena);
+            let ref_scores = load_reference_g2w_scores(model_train_base, arena)?;
             let num_features = ref_scores[0].subfeatures.len();
-            PostProcessor::new_zscore(ref_scores, num_features, arena)
+            Ok(PostProcessor::new_zscore(ref_scores, num_features, arena))
         }
         ScoreType::Percentile => {
-            let ref_scores = load_reference_g2w_scores(arena);
+            let ref_scores = load_reference_g2w_scores(model_train_base, arena)?;
             let num_features = ref_scores[0].subfeatures.len();
-            PostProcessor::new_percentile(ref_scores, num_features, arena)
+            Ok(PostProcessor::new_percentile(ref_scores, num_features, arena))
         }
     }
 }
@@ -208,8 +205,8 @@ fn load_post_processor<'a>(score_type: ScoreType, arena: &'a Bump) -> PostProces
 /// Load a reference dataset of biophysical feature scores
 /// (currently [`G2WScores`]) that corresponds to the human
 /// proteome or a PDB-derived dataset.
-fn load_reference_g2w_scores(arena: &Bump) -> Vec<'_, G2WScores<'_>> {
-    todo!()
+fn load_reference_g2w_scores(model_train_base: ModelTrainingType, arena: &Bump) -> Result<&[G2WScores<'_>], Error> {
+    load_legacy_reference_g2w_scores(model_train_base, arena)
 }
 
 /// Load the ML model that converts residue-level feature grids
