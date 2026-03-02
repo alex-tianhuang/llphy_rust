@@ -15,9 +15,14 @@ use std::{
 mod io;
 use crate::{
     datatypes::{
-        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, ModelTrainingType, PostProcessor, ScoreType
+        AAMap, FastaEntry, FeatureGrid, GridScorer, LLPhyFeature, ModelTrainingType, PostProcessor,
+        ScoreType,
     },
-    fasta::read_fasta, load_legacy::{load_legacy_pdb_statistics, load_legacy_reference_g2w_scores},
+    fasta::read_fasta,
+    load_legacy::{
+        LEGACY_FEATURE_NAMES, load_legacy_model_and_feature_order, load_legacy_pdb_statistics,
+        load_legacy_reference_g2w_scores,
+    },
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
@@ -27,7 +32,11 @@ mod fasta;
 mod load_legacy;
 use indicatif::{self, ProgressBar};
 use pyo3::{
-    Bound, FromPyObject, PyResult, prelude::pymodule, pyfunction, types::{PyAnyMethods, PyModule, PyModuleMethods, PyString}, wrap_pyfunction
+    Bound, FromPyObject, PyResult, Python,
+    prelude::pymodule,
+    pyfunction,
+    types::{PyModule, PyModuleMethods},
+    wrap_pyfunction,
 };
 /// Program that computes phase separation propensity and related
 /// biophysical features of sequences from a given input file.
@@ -47,11 +56,13 @@ pub struct Args {
     output_file: Option<PathBuf>,
     /// The type of score to output.
     #[arg(short, long, default_value = "percentile", value_enum)]
+    #[pyo3(default = ScoreType::Percentile)]
     score_type: ScoreType,
     /// The phase separation model to use,
     /// categorized by the negative set it was trained on.
     #[arg(short, long, default_value = "human+PDB", value_enum)]
-    model_train_base: ModelTrainingType
+    #[pyo3(default = ModelTrainingType::HumanPDB)]
+    model_train_base: ModelTrainingType,
 }
 #[pymodule(name = "_rust")]
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -75,21 +86,27 @@ fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// This function calls [`read_fasta`] and [`seqs_to_grids`],
 /// which both touch the stderr output. It also prints one message to stderr.
 #[pyfunction]
-fn run_fasta_scorer(args: Args) -> Result<(), Error> {
+fn run_fasta_scorer(py: Python, args: Args) -> Result<(), Error> {
     let Args {
         input_file,
         output_file,
         score_type,
-        model_train_base
+        model_train_base,
     } = args;
     // Everything de-allocates when this does,
     // so no need to de-allocate anything else!
     let arena = Bump::new();
     let (pdb_statistics_names, pdb_statistics_scorer) = load_named_pdb_statistics(&arena)?;
     let feature_names = leak_vec(load_feature_names(&arena));
-    sort_feature_names(feature_names, pdb_statistics_names);
+    feature_names.sort_by_key(|name| {
+        feature_traversal_order(name, pdb_statistics_names)
+    });
     let post_processor = load_post_processor(score_type, model_train_base, &arena)?;
-    let model = leak_vec(load_llphy_model(&arena));
+    let model = load_llphy_model_and_feature_order(model_train_base, &arena, py)?;
+    model.sort_by_key(|(name, _)| {
+        pdb_statistics_names.iter().enumerate().find(|(_, (known_name, _))| known_name == name).map(|(idx, _)|idx).unwrap_or(usize::MAX)
+    });
+    let model = arena.alloc_slice_fill_iter(model.iter().map(|(_, feature)| feature.clone()));
     let sequences = leak_vec(read_fasta(input_file, &arena)?);
     let grids = leak_vec(seqs_to_grids::<true>(
         sequences,
@@ -120,46 +137,29 @@ fn run_fasta_scorer(args: Args) -> Result<(), Error> {
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 fn load_feature_names(arena: &Bump) -> Vec<'_, &str> {
-    todo!()
+    Vec::from_iter_in(LEGACY_FEATURE_NAMES.iter().cloned(), arena)
 }
-/// Sort feature names in the order in which they will be traversed.
-///
+/// Docs out of date at the moment, but this is a helper function for
+/// sorting things by output order.
+/// 
 /// The traversal order is defined by flattening the `pdb_statistics_names`
 /// and filtering out names that do not appear in `feature_names`.
-///
-/// If a feature name is not in the `pdb_statistics_names`,
-/// it is ommitted from the returned slice.
-fn sort_feature_names<'a, 'b>(
-    feature_names: &'a mut [&'b str],
+fn feature_traversal_order<'a, 'b>(
+    feature_name: &str,
     pdb_statistics_names: &[(&str, [&str; 2])],
-) -> &'a mut [&'b str] {
-    let mut num_not_present = 0;
-    for name in feature_names.iter_mut() {
-        if pdb_statistics_names
-            .iter()
-            .find(|(_, [sr_name, lr_name])| name == sr_name || name == lr_name)
-            .is_none()
-        {
-            num_not_present += 1;
-        }
-    }
-    // The feature names slice is like 8 long, so `8 x log(8) x pdb_statistics_names.len()` time seems ok.
-    feature_names.sort_by_key(|name| {
-       pdb_statistics_names
-            .iter()
-            .enumerate()
-            .find(|(_, (_, [sr_name, lr_name]))| name == sr_name || name == lr_name)
-            .map(|(slot, (sr_name, _))| {
-                if sr_name == name {
-                    (slot, 0)
-                } else {
-                    (slot, 1)
-                }
-            }) 
-            .unwrap_or((usize::MAX, 0))
-    });
-    let len = feature_names.len() - num_not_present;
-    &mut feature_names[..len]
+) -> (usize, u8) {
+    pdb_statistics_names
+        .iter()
+        .enumerate()
+        .find(|(_, (_, [sr_name, lr_name]))| feature_name == *sr_name || feature_name == *lr_name)
+        .map(|(slot, (sr_name, _))| {
+            if *sr_name == feature_name {
+                (slot, 0)
+            } else {
+                (slot, 1)
+            }
+        })
+        .unwrap_or((usize::MAX, 0))
 }
 /// Load PDB statistics that help compute [`seqs_to_grids`],
 /// and the names of the long and short range statistics.
@@ -185,7 +185,11 @@ fn load_named_pdb_statistics<'a>(
 /// lab's [python package], written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_post_processor<'a>(score_type: ScoreType, model_train_base: ModelTrainingType, arena: &'a Bump) -> Result<PostProcessor<'a>, Error> {
+fn load_post_processor<'a>(
+    score_type: ScoreType,
+    model_train_base: ModelTrainingType,
+    arena: &'a Bump,
+) -> Result<PostProcessor<'a>, Error> {
     match score_type {
         ScoreType::Raw => Ok(PostProcessor::new_raw()),
         ScoreType::ZScore => {
@@ -196,7 +200,11 @@ fn load_post_processor<'a>(score_type: ScoreType, model_train_base: ModelTrainin
         ScoreType::Percentile => {
             let ref_scores = load_reference_g2w_scores(model_train_base, arena)?;
             let num_features = ref_scores[0].subfeatures.len();
-            Ok(PostProcessor::new_percentile(ref_scores, num_features, arena))
+            Ok(PostProcessor::new_percentile(
+                ref_scores,
+                num_features,
+                arena,
+            ))
         }
     }
 }
@@ -205,7 +213,10 @@ fn load_post_processor<'a>(score_type: ScoreType, model_train_base: ModelTrainin
 /// Load a reference dataset of biophysical feature scores
 /// (currently [`G2WScores`]) that corresponds to the human
 /// proteome or a PDB-derived dataset.
-fn load_reference_g2w_scores(model_train_base: ModelTrainingType, arena: &Bump) -> Result<&[G2WScores<'_>], Error> {
+fn load_reference_g2w_scores(
+    model_train_base: ModelTrainingType,
+    arena: &Bump,
+) -> Result<&[G2WScores<'_>], Error> {
     load_legacy_reference_g2w_scores(model_train_base, arena)
 }
 
@@ -219,8 +230,12 @@ fn load_reference_g2w_scores(model_train_base: ModelTrainingType, arena: &Bump) 
 /// (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-fn load_llphy_model<'a>(arena: &'a Bump) -> Vec<'a, LLPhyFeature> {
-    todo!()
+fn load_llphy_model_and_feature_order<'a>(
+    model_train_base: ModelTrainingType,
+    arena: &'a Bump,
+    py: Python,
+) -> Result<&'a mut [(&'a str, LLPhyFeature)], Error> {
+    load_legacy_model_and_feature_order(model_train_base, arena, py)
 }
 
 /// Given sequences and PDB statistics (currently `&[GridScorer]`),
@@ -323,7 +338,6 @@ fn get_g2w_scores<'a>(
 ) -> Vec<'a, G2WScores<'a>> {
     let mut scores = Vec::with_capacity_in(grids.len(), arena);
     for grid in grids {
-        debug_assert_eq!(model.len(), grid.len());
         let mut subfeatures = Vec::with_capacity_in(model.len() * 2, arena);
         let mut grid_iter = grid.iter();
         for ((_, [sr_name, lr_name]), subfeature) in pdb_statistics_names.iter().zip(model) {
@@ -408,6 +422,7 @@ fn write_output(
         for (slot, value_str) in feature_slots.iter_mut().zip(subfeatures_buffer.iter()) {
             *slot = unsafe { &*(&**value_str as *const str) };
         }
+        feature_sum_buffer.clear();
         write!(feature_sum_buffer, "{}", output_row.feature_sum).unwrap();
         *feature_sum_slot = unsafe { &*(&**feature_sum_buffer as *const str) };
         write_row(&column_buffer)?;

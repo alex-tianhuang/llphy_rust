@@ -58,7 +58,7 @@ pub struct FeatureGridEntry {
 /// [python package], written by Hao Cai (@haocai1992).
 ///
 /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-#[derive(Clone, Copy, PartialOrd, PartialEq, Deserialize)]
+#[derive(Clone, Copy, PartialOrd, PartialEq, Deserialize, Debug)]
 pub(crate) struct LineKey(f64);
 impl GridScorer<'_> {
     /// Turn a sequence into a biophysical feature grid (currently [`FeatureGrid`])
@@ -277,6 +277,7 @@ impl GridScorer<'_> {
         };
         let mut search_down = next_search_down(start_index);
         let mut search_up = next_search_up(start_index);
+        debug_assert!(table.len() > 0, "{:?}", table);
         for _ in 0..table.len() {
             let (sr_index, sr_sqr_delta) = match (search_down, search_up) {
                 (Some((ptr_down, sr_sqr_delta_down)), Some((ptr_up, sr_sqr_delta_up))) => {
@@ -316,6 +317,8 @@ impl GridScorer<'_> {
                         if sqr_delta < entry.0 {
                             best_entry = Some((sqr_delta, sr_index, lr_index))
                         }
+                    } else {
+                        best_entry = Some((sqr_delta, sr_index, lr_index))
                     }
                 }
             };
@@ -324,6 +327,9 @@ impl GridScorer<'_> {
                 continue;
             };
             check_lr_index(lr_index);
+        }
+        if best_entry.is_none() {
+
         }
         let (_, sr_index, lr_index) = best_entry.unwrap();
         table[sr_index].1[lr_index].1

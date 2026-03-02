@@ -4,9 +4,10 @@ use crate::datatypes::{AAMap, FeatureGridEntry};
 
 /// Thresholds and signs for mapping short-range
 /// and long-range feature-grids to sequence-level feature values.
+#[derive(Clone, Debug)]
 pub struct LLPhyFeature {
-    thresholds: AAMap<LLPhyThresholds>,
-    signs: LLPhySigns,
+    pub thresholds: AAMap<LLPhyThresholds>,
+    pub signs: LLPhySigns,
 }
 /// Bounds for the short-range and long-range feature grids.
 /// 
@@ -14,16 +15,18 @@ pub struct LLPhyFeature {
 /// where being greater than the `upper` threshold is `+1`
 /// to the score, and being smaller than the `lower` threshold
 /// is `-1` to the score.
-struct LLPhyThresholds {
+#[derive(Clone, Debug)]
+pub struct LLPhyThresholds {
     /// Short-range thresholds.
-    sr: (f64, f64),
+    pub sr: [f64; 2],
     /// Long-range thresholds.
-    lr: (f64, f64),
+    pub lr: [f64 ; 2],
 }
 /// The sign to apply to short-range or long-range features.
-struct LLPhySigns {
-    sr: bool,
-    lr: bool,
+#[derive(Clone, Copy, Debug)]
+pub struct LLPhySigns {
+    pub sr: i8,
+    pub lr: i8,
 }
 
 impl LLPhyFeature {
@@ -35,7 +38,7 @@ impl LLPhyFeature {
     ) -> isize {
         let mut sum_score = 0;
         for (weight, &res_scores) in self.thresholds.values().zip(grid_row.values()) {
-            let (upper, lower) = if SR { weight.sr } else { weight.lr };
+            let [upper, lower] = if SR { weight.sr } else { weight.lr };
             for entry in res_scores {
                 let grid_value = if SR { entry.sr } else { entry.lr };
                 sum_score += (grid_value > upper) as isize;

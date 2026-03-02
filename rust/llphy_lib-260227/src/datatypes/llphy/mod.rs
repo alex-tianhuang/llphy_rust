@@ -5,7 +5,7 @@ use std::fmt::Display;
 use anyhow::Error;
 pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, MAX_XMER, LineKey};
 mod model;
-pub(crate) use model::LLPhyFeature;
+pub(crate) use model::{LLPhyFeature, LLPhySigns, LLPhyThresholds};
 mod post_processor;
 pub(crate) use post_processor::{PostProcessor, ScoreType};
 use clap::ValueEnum;
@@ -13,7 +13,7 @@ use pyo3::{PyErr, FromPyObject};
 
 /// Whether the phase separation model was trained on a negative
 /// dataset consisting of the human proteome, the PDB, or both.
-#[derive(Clone, ValueEnum)]
+#[derive(Copy, Clone, ValueEnum)]
 #[value(verbatim_doc_comment)]
 pub enum ModelTrainingType {
     /// Model was trained on a human proteome negative dataset.
