@@ -56,7 +56,7 @@ impl<'a> PostProcessor<'a> {
     /// Make a new [`PostProcessor`] that converts biphysical feature scores
     /// to z-scores.
     pub fn new_zscore(
-        data: Vec<'_, G2WScores<'_>>,
+        data: &[G2WScores<'_>],
         num_features: usize,
         arena: &'a Bump,
     ) -> Self {
@@ -71,7 +71,7 @@ impl<'a> PostProcessor<'a> {
     /// Make a new [`PostProcessor`] that converts biphysical feature scores
     /// to percentiles.
     pub fn new_percentile(
-        data: Vec<'_, G2WScores<'_>>,
+        data: &[G2WScores<'_>],
         num_features: usize,
         arena: &'a Bump,
     ) -> Self {
@@ -82,7 +82,7 @@ impl<'a> PostProcessor<'a> {
         for entry in data {
             feature_sums.push(entry.feature_sum);
             for (subfeature_dest, subfeature_value) in
-                subfeature_dests.iter_mut().zip(entry.subfeatures)
+                subfeature_dests.iter_mut().zip(entry.subfeatures.iter())
             {
                 subfeature_dest.push(*subfeature_value)
             }
