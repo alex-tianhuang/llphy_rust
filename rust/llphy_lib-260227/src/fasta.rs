@@ -103,7 +103,7 @@ fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, Fasta
                 continue;
             }
             ParseResult::EmptyAndInvalidBytes => {
-                eprintln!("could not parse entry (all invalid bytes): {}", header);
+                eprintln!("could not parse entry (contained invalid bytes): {}", header);
                 continue;
             }
         }
