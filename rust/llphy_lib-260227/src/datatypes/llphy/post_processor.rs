@@ -1,36 +1,15 @@
-//! Module defining structs that turn raw biophysical feature scores
+//! Module for turning raw biophysical feature scores
 //! to z-scores or percentiles if requested.
-//! 
-//! See [`ScoreType`] and [`PostProcessor`].
+//!
+//! See [`PostProcessor`].
 use crate::{G2WScores, leak_vec};
-use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
-use clap::ValueEnum;
-use pyo3::{PyErr, FromPyObject};
-
-/// The type of score to return.
-#[derive(Clone, ValueEnum)]
-#[value(verbatim_doc_comment)]
-pub enum ScoreType {
-    /// Report raw `llphyscore` values and features.
-    Raw,
-    /// Report z-scores in comparison to a reference proteome. 
-    ZScore,
-    /// Report values in as percentiles compared to a reference proteome.
-    Percentile,
-}
-impl<'a, 'py> FromPyObject<'a, 'py> for ScoreType {
-    type Error = PyErr;
-    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
-        let s = obj.extract()?;
-        Ok(ScoreType::from_str(s, false).map_err(Error::msg)?)
-    }
-}
 /// A data struct derived from a reference dataset of
 /// phase separation positive/negative proteins.
-/// 
+///
 /// Depending on what score-type is asked for (see [`ScoreType`]),
 /// the post-processing will require different data.
+#[derive(Debug)]
 pub enum PostProcessor<'a> {
     /// No post-processing required.
     Raw,
@@ -55,11 +34,7 @@ impl<'a> PostProcessor<'a> {
     }
     /// Make a new [`PostProcessor`] that converts biphysical feature scores
     /// to z-scores.
-    pub fn new_zscore(
-        data: &[G2WScores<'_>],
-        num_features: usize,
-        arena: &'a Bump,
-    ) -> Self {
+    pub fn new_zscore(data: &[G2WScores<'_>], num_features: usize, arena: &'a Bump) -> Self {
         let subfeature_zscore_data =
             (0..num_features).map(|i| mean_std(data.iter().map(|entry| entry.subfeatures[i])));
         let subfeatures = Vec::from_iter_in(subfeature_zscore_data, arena);
@@ -70,11 +45,7 @@ impl<'a> PostProcessor<'a> {
     }
     /// Make a new [`PostProcessor`] that converts biphysical feature scores
     /// to percentiles.
-    pub fn new_percentile(
-        data: &[G2WScores<'_>],
-        num_features: usize,
-        arena: &'a Bump,
-    ) -> Self {
+    pub fn new_percentile(data: &[G2WScores<'_>], num_features: usize, arena: &'a Bump) -> Self {
         let mut feature_sums = Vec::with_capacity_in(data.len(), arena);
         let subfeature_zscore_data =
             (0..num_features).map(|_| Vec::with_capacity_in(data.len(), arena));
@@ -146,6 +117,24 @@ fn mean_std(iter: impl ExactSizeIterator<Item = f64>) -> (f64, f64) {
 }
 /// Utility for computing a percentile from a sorted list of reference values.
 fn percentile(value: f64, reference_values: &[f64]) -> f64 {
-    let (Ok(idx) | Err(idx)) = reference_values.binary_search_by(|probe| probe.total_cmp(&value));
-    (idx * 100) as f64 / reference_values.len() as f64
+    match reference_values.binary_search_by(|probe| probe.total_cmp(&value)) {
+        Ok(idx) => {
+            let mut num_less = 0;
+            for i in (0..idx).rev() {
+                if reference_values[i] < value {
+                    num_less = i + 1;
+                    break;
+                }
+            }
+            let mut num_less_or_eq = reference_values.len();
+            for i in (idx + 1)..reference_values.len() {
+                if reference_values[i] > value {
+                    num_less_or_eq = i;
+                    break;
+                }
+            }
+            ((num_less + num_less_or_eq + 1) * 50) as f64 / reference_values.len() as f64
+        }
+        Err(idx) => (idx * 100) as f64 / reference_values.len() as f64,
+    }
 }
