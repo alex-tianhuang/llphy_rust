@@ -29,7 +29,7 @@ impl<A: AALike> aa_str<A> {
     }
     /// Try and convert the slice of bytes to an [`aa_str`].
     ///
-    /// Fails if any of the bytes in the slice are non-[`Aminoacid`]s.
+    /// Fails if any of the bytes in the slice are non-aminoacids.
     pub fn from_bytes(slice: &[u8]) -> Result<&Self, NotAAStrError<A>> {
         for (at, &ch) in slice.iter().enumerate() {
             A::try_from(ch as char).map_err(|_| NotAAStrError {
@@ -109,15 +109,5 @@ impl<A: AALike> NotAAStrError<A> {
     /// Constructor.
     pub fn new(at: usize, ch: char) -> Self {
         Self { at, ch, __phantom: PhantomData }
-    }
-    /// Increase the position of this error by `offset`.
-    ///
-    /// Useful when translating an error from a subslice of bytes.
-    pub fn offset(self, offset: usize) -> Self {
-        Self {
-            at: self.at + offset,
-            ch: self.ch,
-            __phantom: PhantomData,
-        }
     }
 }

@@ -4,7 +4,9 @@ use serde::{Deserialize, de::Visitor};
 
 use crate::datatypes::{AMINOACIDS, Aminoacid};
 use std::{
-    fmt::Debug, marker::PhantomData, ops::{Index, IndexMut}
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
 };
 
 /// A residue mapping type.
@@ -16,7 +18,7 @@ use std::{
 ///
 /// Usage
 /// -----
-/// 
+///
 /// Construct like so:
 /// ```
 /// let map = AAMap([0.0_f32; 20]);
