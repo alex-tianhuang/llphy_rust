@@ -2,7 +2,7 @@
 //! (currently [`GridScorer`]) that converts sequences
 //! to feature grids.
 use crate::{
-    datatypes::{AAMap, Aminoacid, aa_canonical_str},
+    datatypes::{AAMap, Aminoacid, MAX_XMER, aa_canonical_str},
     leak_vec,
 };
 use bumpalo::{Bump, collections::Vec};
@@ -11,13 +11,7 @@ use std::{
     array,
     cmp::{self, Ordering},
 };
-/// The minimum residue separation that we have collected residue statistics for.
-///
-/// There are a bunch of assumptions in other code that rely on this number
-/// being `1`, so probably it will never ever change.
-const MIN_XMER: usize = 1;
-/// The maximum residue separation that we have collected residue statistics for.
-pub(crate) const MAX_XMER: usize = 40;
+
 /// Struct that uses PDB-statistics to
 /// convert sequences to feature grids.
 ///
@@ -40,7 +34,7 @@ pub struct GridScorer<'a> {
 pub type FeatureGrid<'a> = AAMap<&'a [FeatureGridEntry]>;
 /// Short-range and long-range grid statistics for one
 /// subsequence.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FeatureGridEntry {
     /// Short range statistic.
     pub sr: f64,
@@ -69,7 +63,7 @@ impl GridScorer<'_> {
         sequence: &aa_canonical_str,
         arena: &'a Bump,
     ) -> FeatureGrid<'a> {
-        let Some(n_sites) = sequence.len().checked_sub(2 * MIN_XMER) else {
+        let Some(n_sites) = sequence.len().checked_sub(2) else {
             return AAMap([&[]; 20]);
         };
         let mut residue_counts = AAMap([0_usize; 20]);
@@ -84,9 +78,9 @@ impl GridScorer<'_> {
             let aa = sequence[i];
             let mut grid_counts = [0, 0, 0];
             let subseq = self.get_seq_centered_at(sequence, i);
-            debug_assert!(subseq.len() >= 2 * MIN_XMER + 1);
+            debug_assert!(subseq.len() >= 3);
             let all_xmer_scores = self.score_subseq_smart(subseq);
-            for (xmer, (freq_sr, freq_lr)) in (MIN_XMER..).zip(all_xmer_scores) {
+            for (xmer, (freq_sr, freq_lr)) in (1..).zip(all_xmer_scores) {
                 let [mean_sr, std_sr] = self.query_avg_sdev_db::<true>(aa, xmer);
                 let [mean_lr, std_lr] = self.query_avg_sdev_db::<false>(aa, xmer);
                 let zscore_sr = (freq_sr - mean_sr) / std_sr;
@@ -133,7 +127,7 @@ impl GridScorer<'_> {
     fn score_subseq_smart<'a>(
         &self,
         subseq: &aa_canonical_str,
-    ) -> impl ExactSizeIterator<Item = (f64, f64)> {
+    ) -> impl Iterator<Item = (f64, f64)> {
         debug_assert!(subseq.len() % 2 == 1);
         let midpoint = subseq.len() / 2;
         debug_assert!(midpoint <= MAX_XMER);
@@ -142,9 +136,10 @@ impl GridScorer<'_> {
         let mut denom_total_a = 0.0;
         let mut denom_total_b = 0.0;
         let aa = subseq[midpoint];
-        let cap = cmp::min(midpoint, MAX_XMER - 1);
+        let cap = cmp::min(midpoint, MAX_XMER);
         (0..cap).map(move |p| {
-            let c_term_position = midpoint + 1 + p;
+            let xmer = p + 1;
+            let c_term_position = midpoint + xmer;
             let [freq_a, std_a] =
                 self.query_freq_pair_db::<true, true>(aa, subseq[c_term_position], p);
             let [freq_b, std_b] =
@@ -153,7 +148,7 @@ impl GridScorer<'_> {
             frequency_sum_b += freq_b / std_b;
             denom_total_a += 1.0 / std_a;
             denom_total_b += 1.0 / std_b;
-            let n_term_position = midpoint - 1 - p;
+            let n_term_position = midpoint - xmer;
             let [freq_a, std_a] =
                 self.query_freq_pair_db::<false, true>(subseq[n_term_position], aa, p);
             let [freq_b, std_b] =
@@ -178,17 +173,17 @@ impl GridScorer<'_> {
     /// [python package], written by Hao Cai (@haocai1992).
     ///
     /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
-    fn query_freq_pair_db<const X: bool, const SR: bool>(
+    pub(crate) fn query_freq_pair_db<const X: bool, const SR: bool>(
         &self,
         aa_a: Aminoacid,
         aa_b: Aminoacid,
-        distance: usize,
+        xmer_minus_one: usize,
     ) -> [f64; 2] {
         let sr_selector = (!SR) as usize;
         if X {
-            self.pair_freq_db_x[distance][aa_a][aa_b][sr_selector]
+            self.pair_freq_db_x[xmer_minus_one][aa_a][aa_b][sr_selector]
         } else {
-            self.pair_freq_db_y[distance][aa_b][aa_a][sr_selector]
+            self.pair_freq_db_y[xmer_minus_one][aa_b][aa_a][sr_selector]
         }
     }
     /// Method for getting a `(mean, std)` pair from the "avg-sdev-DB".
@@ -204,7 +199,7 @@ impl GridScorer<'_> {
     /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
     fn query_avg_sdev_db<const SR: bool>(&self, aa: Aminoacid, xmer: usize) -> [f64; 2] {
         let sr_selector = (!SR) as usize;
-        self.avg_sdev_db[aa][xmer][sr_selector]
+        self.avg_sdev_db[aa][xmer - 1][sr_selector]
     }
     /// Method for getting a `(count, short-range, long-range)`
     /// data tuple from the "z-grid-DB". This method may fail to return
@@ -227,9 +222,9 @@ impl GridScorer<'_> {
         sr_linekey: LineKey,
         lr_linekey: LineKey,
     ) -> Option<[isize; 3]> {
-        let table = self.z_grid_db[aa][xmer];
+        let table = self.z_grid_db[aa][xmer - 1];
         let row = table
-            .binary_search_by_key(&sr_linekey,|(gridpoint, _)| *gridpoint)
+            .binary_search_by_key(&sr_linekey, |(gridpoint, _)| *gridpoint)
             .ok()?;
         let (_, row) = table[row];
         let cell = row
@@ -259,7 +254,7 @@ impl GridScorer<'_> {
         zscore_sr: f64,
         zscore_lr: f64,
     ) -> [isize; 3] {
-        let table = self.z_grid_db[aa][xmer];
+        let table = self.z_grid_db[aa][xmer - 1];
         let mut best_entry: Option<(f64, usize, usize)> = None;
         let (Ok(start_index) | Err(start_index)) =
             table.binary_search_by(|(sr_gridpoint, _)| sr_gridpoint.0.total_cmp(&zscore_sr));
@@ -328,9 +323,6 @@ impl GridScorer<'_> {
             };
             check_lr_index(lr_index);
         }
-        if best_entry.is_none() {
-
-        }
         let (_, sr_index, lr_index) = best_entry.unwrap();
         table[sr_index].1[lr_index].1
     }
@@ -344,7 +336,7 @@ impl LineKey {
     ///
     /// [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
     pub fn new(zscore: f64) -> Self {
-        LineKey(((zscore / 2.0).round() * 2.0).clamp(-8.0, 12.0))
+        LineKey(((zscore * 2.0).round() / 2.0).clamp(-8.0, 12.0))
     }
 }
 impl Ord for LineKey {
