@@ -134,7 +134,7 @@ fn load_pair_freq_db<'a>(
 ) -> Result<(&'a [PairFreqDBInner], &'a [PairFreqDBInner]), Error> {
     fn initialize_pair_freq_db(arena: &Bump) -> &mut [PairFreqDBInner] {
         debug_assert_eq!(align_of::<PairFreqDBInner>(), align_of::<f64>());
-        let cap_in_bytes = MAX_XMER * size_of::<PairFreqDBInner>();
+        let cap_in_bytes = (MAX_XMER + 1) * size_of::<PairFreqDBInner>();
         let cap_in_floats = cap_in_bytes / size_of::<f64>();
         let buf = arena.alloc_slice_fill_copy(cap_in_floats, f64::NAN);
         let pair_freq_db: &mut [PairFreqDBInner];
@@ -194,14 +194,6 @@ fn load_pair_freq_db<'a>(
         let aa_x = Aminoacid::try_from(aa_x).map_err(|_| fail())?;
         let aa_y = Aminoacid::try_from(aa_y).map_err(|_| fail())?;
         let separation = parse_bytes::<usize>(separation).ok_or_else(fail)?;
-        let Some(index) = separation.checked_sub(1) else {
-            warner.warn(format_args!(
-                "ignoring line with non-positive separation = {}: {}",
-                separation,
-                String::from_utf8_lossy(line)
-            ));
-            return Ok(());
-        };
         while let Some(ptype) = parts.next() {
             let is_x = ptype.starts_with(b"X_");
             if !(is_x || ptype.starts_with(b"Y_")) {
@@ -232,7 +224,7 @@ fn load_pair_freq_db<'a>(
                 ));
                 continue;
             }
-            let data_block = &mut target[index][first_aa][second_aa];
+            let data_block = &mut target[separation][first_aa][second_aa];
             let is_sr = tag == tag_sr.as_bytes();
             if is_sr {
                 data_block[0] = [freq, sdev]
