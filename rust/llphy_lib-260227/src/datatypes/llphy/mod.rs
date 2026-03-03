@@ -3,7 +3,7 @@ mod pdb_statistics;
 use std::fmt::Display;
 
 use anyhow::Error;
-pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, MAX_XMER, LineKey};
+pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, LineKey};
 mod model;
 pub(crate) use model::{LLPhyFeature, LLPhySigns, LLPhyThresholds};
 mod post_processor;
@@ -11,6 +11,8 @@ pub(crate) use post_processor::{PostProcessor, ScoreType};
 use clap::ValueEnum;
 use pyo3::{PyErr, FromPyObject};
 
+/// The maximum residue separation that we have collected residue statistics for.
+pub(crate) const MAX_XMER: usize = 40;
 /// Whether the phase separation model was trained on a negative
 /// dataset consisting of the human proteome, the PDB, or both.
 #[derive(Copy, Clone, ValueEnum)]
