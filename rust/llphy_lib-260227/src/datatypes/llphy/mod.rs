@@ -3,13 +3,13 @@ mod pdb_statistics;
 use std::fmt::Display;
 
 use anyhow::Error;
-pub(crate) use pdb_statistics::{GridScorer, FeatureGrid, FeatureGridEntry, LineKey};
+pub(crate) use pdb_statistics::{FeatureGrid, FeatureGridEntry, GridScorer, LineKey};
 mod model;
 pub(crate) use model::{LLPhyFeature, LLPhySigns, LLPhyThresholds};
 mod post_processor;
-pub(crate) use post_processor::{PostProcessor, ScoreType};
 use clap::ValueEnum;
-use pyo3::{PyErr, FromPyObject};
+pub(crate) use post_processor::PostProcessor;
+use pyo3::{FromPyObject, PyErr};
 
 /// The maximum residue separation that we have collected residue statistics for.
 pub(crate) const MAX_XMER: usize = 40;
@@ -39,8 +39,27 @@ impl Display for ModelTrainingType {
         let s = match self {
             Self::Human => "human",
             Self::PDB => "PDB",
-            Self::HumanPDB => "human+PDB"
+            Self::HumanPDB => "human+PDB",
         };
         f.write_str(s)
+    }
+}
+
+/// The type of score to return.
+#[derive(Clone, ValueEnum)]
+#[value(verbatim_doc_comment)]
+pub enum ScoreType {
+    /// Report raw `llphyscore` values and features.
+    Raw,
+    /// Report z-scores in comparison to a reference proteome.
+    ZScore,
+    /// Report values in as percentiles compared to a reference proteome.
+    Percentile,
+}
+impl<'a, 'py> FromPyObject<'a, 'py> for ScoreType {
+    type Error = PyErr;
+    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
+        let s = obj.extract()?;
+        Ok(ScoreType::from_str(s, false).map_err(Error::msg)?)
     }
 }
