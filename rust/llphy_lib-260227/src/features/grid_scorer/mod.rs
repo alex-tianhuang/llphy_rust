@@ -8,11 +8,9 @@ pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
 pub use z_grid_db::ZGridDB;
 
 use crate::{
-    datatypes::{
-        AAMap, MAX_XMER, aa_canonical_str,
-        llphy::features::grid_scorer::{
-            avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry, z_grid_db::ZGridDBEntry,
-        },
+    datatypes::{AAMap, MAX_XMER, aa_canonical_str},
+    features::grid_scorer::{
+        avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry, z_grid_db::ZGridDBEntry,
     },
     leak_vec,
 };
@@ -119,7 +117,7 @@ impl GridScorer<'_> {
             feature_b_scores: feature_b_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
         }
     }
-    
+
     /// Get feature `a` and `b` statistics for the given subsequence.
     fn score_subseq_smart<'a>(
         &self,
@@ -170,10 +168,7 @@ impl GridScorer<'_> {
 /// Try and get a subsequence centered at the given `center` index,
 /// starting with spans of `MAX_XMER` at shrinking until it fits
 /// inside the sequence.
-fn get_subseq_centered_at(
-    sequence: &aa_canonical_str,
-    center: usize,
-) -> &aa_canonical_str {
+fn get_subseq_centered_at(sequence: &aa_canonical_str, center: usize) -> &aa_canonical_str {
     let space_on_left = center;
     let space_on_right = sequence.len() - 1 - center;
     let min_space = cmp::min(space_on_left, space_on_right);

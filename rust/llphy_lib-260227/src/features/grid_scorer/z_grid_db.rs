@@ -1,7 +1,8 @@
 //! Module defining [`ZGridDB`].
 use std::ops::{Deref, DerefMut};
 
-use crate::datatypes::{AAMap, llphy::features::grid_scorer::xmer::XmerIndexableArray};
+use crate::datatypes::AAMap;
+use crate::features::grid_scorer::xmer::XmerIndexableArray;
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -12,7 +13,7 @@ use crate::datatypes::{AAMap, llphy::features::grid_scorer::xmer::XmerIndexableA
 pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 /// A `(zscore_a, zscore_b)`-indexable collection of weights
 /// for features `a` and `b`.
-/// 
+///
 /// For quick lookup, the two layers of slices are expected to be
 /// sorted by `f64`, the `gridpoint`s associated to each index.
 pub struct ZGridSubtable<'a>(&'a mut [(f64, &'a mut [(f64, ZGridDBEntry)])]);
@@ -63,19 +64,22 @@ impl ZGridSubtable<'_> {
     /// differences to the given zscores.
     fn lookup_thorough(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {
         let mut best_entry: Option<(f64, &ZGridDBEntry)> = None;
-        let (Ok(start_index) | Err(start_index)) =
-            self.0.binary_search_by(|(gridpoint, _)| gridpoint.total_cmp(&zscore_a));
+        let (Ok(start_index) | Err(start_index)) = self
+            .0
+            .binary_search_by(|(gridpoint, _)| gridpoint.total_cmp(&zscore_a));
         // I assume this gets optimized out
         let to_sqr_delta_a = |x: f64| {
             let delta_a = x - zscore_a;
             delta_a * delta_a
         };
-        let next_search_down = |idx: usize| {
-            idx.checked_sub(1)
-                .map(|i| (i, to_sqr_delta_a(self.0[i].0)))
-        };
+        let next_search_down =
+            |idx: usize| idx.checked_sub(1).map(|i| (i, to_sqr_delta_a(self.0[i].0)));
         let next_search_up = |idx: usize| {
-            Some(idx).and_then(|i| self.0.get(i).map(|(gridpoint, _)| (i, to_sqr_delta_a(*gridpoint))))
+            Some(idx).and_then(|i| {
+                self.0
+                    .get(i)
+                    .map(|(gridpoint, _)| (i, to_sqr_delta_a(*gridpoint)))
+            })
         };
         let mut down_search = next_search_down(start_index);
         let mut up_search = next_search_up(start_index);
@@ -103,7 +107,7 @@ impl ZGridSubtable<'_> {
             };
             if let Some((best_sqr_delta, entry)) = best_entry {
                 if best_sqr_delta <= sqr_delta_a {
-                    return entry
+                    return entry;
                 }
             }
             let (_, ref subarr) = self.0[i];

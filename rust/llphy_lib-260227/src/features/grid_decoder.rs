@@ -1,5 +1,6 @@
 //! Module defining [`GridDecoder`].
-use crate::datatypes::{AAMap, llphy::features::thresholds::Thresholds};
+use crate::datatypes::AAMap;
+use crate::features::thresholds::Thresholds;
 
 /// Turns a [`GridScore`](crate::datatypes::GridScore) into
 /// a sequence-level numeric feature.
