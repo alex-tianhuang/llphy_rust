@@ -26,15 +26,15 @@ impl DerefMut for Thresholds {
 }
 impl Thresholds {
     /// Get a new [`Thresholds`] struct that is filled with `f64::NAN`.
-    pub fn new_nan_filled() -> AAMap<ThresholdPair> {
-        AAMap(
+    pub fn new_nan_filled() -> Self {
+        Self(AAMap(
             [const {
                 ThresholdPair {
                     lower: f64::NAN,
                     upper: f64::NAN,
                 }
             }; 20],
-        )
+        ))
     }
     #[cfg(debug_assertions)]
     /// True if there are `f64::NAN`s in any slot of the thresholds.

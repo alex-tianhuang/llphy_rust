@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Read the file at `path` into a memory arena, and parse it into
 /// a vector of [`FastaEntry`] structs.
@@ -18,19 +18,13 @@ use std::path::PathBuf;
 /// --
 /// May log warnings to stderr,
 /// because it calls [`parse_fasta_entries`] which logs to stderr.
-pub fn read_fasta(path: PathBuf, arena: &Bump) -> Result<Vec<'_, FastaEntry<'_>>, Error> {
-    let bytes = read_file(&path, arena)?;
+pub fn read_fasta<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, FastaEntry<'a>>, Error> {
+    let bytes = read_file(path, arena)?;
     if bytes.is_empty() {
-        return Err(Error::msg(format!(
-            "expected non-empty fasta file at {}, got empty file",
-            path.display()
-        )));
+        return Err(Error::msg("got empty file"));
     }
     if !bytes.starts_with(&[b'>']) {
-        return Err(Error::msg(format!(
-            "expected fasta file at {}, got non-`>` character on first line",
-            path.display()
-        )));
+        return Err(Error::msg("got non-`>` character on first line"));
     }
     Ok(parse_fasta_entries(bytes, arena))
 }

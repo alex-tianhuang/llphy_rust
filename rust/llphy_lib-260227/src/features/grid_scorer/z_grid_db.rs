@@ -1,6 +1,5 @@
 //! Module defining [`ZGridDB`].
 use std::ops::{Deref, DerefMut};
-
 use crate::datatypes::AAMap;
 use crate::features::grid_scorer::xmer::XmerIndexableArray;
 
@@ -16,7 +15,7 @@ pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 ///
 /// For quick lookup, the two layers of slices are expected to be
 /// sorted by `f64`, the `gridpoint`s associated to each index.
-pub struct ZGridSubtable<'a>(&'a mut [(f64, &'a mut [(f64, ZGridDBEntry)])]);
+pub struct ZGridSubtable<'a>(&'a [(f64, &'a [(f64, ZGridDBEntry)])]);
 /// Weights for features `a` and `b`,
 /// for each `(aa, xmer, zscore_a, zscore_b)` tuple.
 pub struct ZGridDBEntry {
@@ -35,7 +34,21 @@ impl<'a> DerefMut for ZGridDB<'a> {
         &mut self.0
     }
 }
-impl ZGridSubtable<'_> {
+impl<'a> ZGridDB<'a> {
+    /// Wrap the inner field with a `ZGridDB`.
+    pub fn new(inner: AAMap<XmerIndexableArray<ZGridSubtable<'a>>>) -> Self {
+        Self(inner)
+    }
+}
+impl<'a> ZGridSubtable<'a> {
+    /// Make a new [`ZGridSubtable`] with no content.
+    pub const fn placeholder() -> Self {
+        Self(&mut [])
+    }
+    /// Make a new [`ZGridSubtable`] with the given data.
+    pub fn new(data: &'a [(f64, &'a [(f64, ZGridDBEntry)])]) -> Self {
+        Self(data)
+    }
     /// Get the entry best associated with the
     /// given `zscore`s for features `a` and `b`.
     pub fn lookup(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {

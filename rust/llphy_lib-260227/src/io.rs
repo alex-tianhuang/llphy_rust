@@ -1,4 +1,5 @@
-//! Module defining [`read_file`].
+//! Module defining various IO utilities
+//! like [`read_file`] and [`read_file_into_global`].
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
 use bytesize::ByteSize;

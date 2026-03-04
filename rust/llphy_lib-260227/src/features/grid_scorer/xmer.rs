@@ -1,5 +1,5 @@
 //! Module defining [`XmerIndexableArray`] and [`XmerSize`].
-use std::{num::NonZero, ops::Index};
+use std::{num::NonZero, ops::{Index, IndexMut}};
 use crate::datatypes::MAX_XMER;
 
 /// A newtype wrapper that indicates something is
@@ -24,6 +24,11 @@ impl<T> Index<XmerSize> for XmerIndexableArray<T> {
     type Output = T;
     fn index(&self, index: XmerSize) -> &Self::Output {
         self.0.index(index.get() - 1)
+    }
+}
+impl<T> IndexMut<XmerSize> for XmerIndexableArray<T> {
+    fn index_mut(&mut self, index: XmerSize) -> &mut Self::Output {
+        self.0.index_mut(index.get() - 1)
     }
 }
 impl<'a, T> IntoIterator for &'a XmerIndexableArray<T> {

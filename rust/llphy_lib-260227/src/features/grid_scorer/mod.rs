@@ -5,12 +5,12 @@ pub use avg_sdev_db::AvgSdevDB;
 use bumpalo::{Bump, collections::Vec};
 pub use pair_freq_db::PairFreqDB;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-pub use z_grid_db::ZGridDB;
+pub use z_grid_db::{ZGridDB, ZGridSubtable, ZGridDBEntry};
 
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
     features::grid_scorer::{
-        avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry, z_grid_db::ZGridDBEntry,
+        avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry,
     },
     leak_vec,
 };
@@ -21,6 +21,8 @@ mod z_grid_db;
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
+/// 
+/// This is a huge stack struct.
 pub struct GridScorer<'a> {
     pub pair_freqs: PairFreqDB,
     pub avg_sdevs: AvgSdevDB,
