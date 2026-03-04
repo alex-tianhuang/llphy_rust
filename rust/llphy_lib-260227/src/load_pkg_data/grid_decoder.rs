@@ -1,7 +1,7 @@
 //! Module defining [`load_grid_decoders`].
 use crate::{
     datatypes::{Aminoacid, ModelTrainingBase},
-    features::{GridDecoder, Thresholds},
+    featurizer::{GridDecoder, Thresholds},
     load_pkg_data::read_archive_file,
 };
 use anyhow::Error;

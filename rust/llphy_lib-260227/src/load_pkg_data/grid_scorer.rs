@@ -1,7 +1,7 @@
 //! Module defining [`load_grid_scorer`].
 use crate::{
     datatypes::{AAMap, Aminoacid},
-    features::{
+    featurizer::{
         GridScorer, grid_scorer::{
             AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry,
             ZGridSubtable, xmer_sizes,
