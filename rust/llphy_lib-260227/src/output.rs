@@ -12,7 +12,7 @@ use crate::datatypes::{FastaEntry, PostProcessedFeatureMatrix};
 /// Output the final biophysical scores (currently [`G2WScores`])
 /// associated with the given `sequences` to a file at the given
 /// `path` or stdout.
-fn write_output(
+pub fn write_output(
     path: Option<PathBuf>,
     sequences: &[FastaEntry<'_>],
     matrix: PostProcessedFeatureMatrix<'_>,
