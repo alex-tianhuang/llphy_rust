@@ -2,8 +2,8 @@
 use crate::datatypes::AAMap;
 use crate::features::thresholds::Thresholds;
 
-/// Turns a [`GridScore`](crate::datatypes::GridScore) into
-/// a sequence-level numeric feature.
+/// Turns a subarray of a [`GridScore`](crate::features::GridScore)
+/// into a sequence-level numeric feature.
 pub struct GridDecoder {
     pub sign: i8,
     pub thresholds: Thresholds,
