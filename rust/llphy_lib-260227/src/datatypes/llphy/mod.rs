@@ -44,3 +44,10 @@ const PAIR_NAMES_AND_FEATURE_NAMES: &'static [(&'static str, [&'static str; 2])]
         ["K-Beta similarity", "K-Beta non-similarity"],
     ),
 ];
+/// Utility method for looking up in the above data struct
+/// by using a `feature_name` (not a `pair_name`).
+pub fn find_pair_and_features_from_one_feature_name(feature_name: &str) -> Option<(&'static str, [&'static str; 2])> {
+    PAIR_NAMES_AND_FEATURE_NAMES.iter().find(|(_, known_names)| {
+        known_names.contains(&feature_name)
+    }).copied()
+}
