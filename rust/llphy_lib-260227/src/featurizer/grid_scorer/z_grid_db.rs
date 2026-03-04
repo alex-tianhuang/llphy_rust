@@ -1,7 +1,7 @@
 //! Module defining [`ZGridDB`].
 use std::ops::{Deref, DerefMut};
 use crate::datatypes::AAMap;
-use crate::features::grid_scorer::xmer::XmerIndexableArray;
+use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.

@@ -1,6 +1,6 @@
 //! Module defining [`GridDecoder`].
 use crate::datatypes::AAMap;
-use crate::features::thresholds::Thresholds;
+use crate::featurizer::thresholds::Thresholds;
 
 /// Turns a subarray of a [`GridScore`](crate::features::GridScore)
 /// into a sequence-level numeric feature.

@@ -9,7 +9,7 @@ pub use z_grid_db::{ZGridDB, ZGridSubtable, ZGridDBEntry};
 
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
-    features::grid_scorer::{
+    featurizer::grid_scorer::{
         avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry,
     },
     leak_vec,

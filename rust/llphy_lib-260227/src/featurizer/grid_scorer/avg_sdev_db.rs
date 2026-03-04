@@ -1,6 +1,6 @@
 //! Module defining [`AvgSdevDB`].
 use crate::datatypes::{AAMap, MAX_XMER};
-use crate::features::grid_scorer::xmer::XmerIndexableArray;
+use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
 use std::ops::{Deref, DerefMut};
 
 /// A struct containing [`AvgSdevDBEntry`] for each
