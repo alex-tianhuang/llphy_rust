@@ -2,7 +2,7 @@
 use crate::datatypes::sequences::aastring::generic::AALike;
 use std::{
     marker::PhantomData,
-    ops::{Index, Range, RangeFrom, RangeTo},
+    ops::{Index, Range, RangeFrom, RangeInclusive, RangeTo},
 };
 use thiserror::Error;
 /// Borrowed string datatype generic over [`AALike`] datatypes,
@@ -85,7 +85,7 @@ macro_rules! derive_index_impl {
         })+
     };
 }
-derive_index_impl!(Range<usize>, RangeFrom<usize>, RangeTo<usize>);
+derive_index_impl!(Range<usize>, RangeFrom<usize>, RangeTo<usize>, RangeInclusive<usize>);
 impl<'a, A: AALike> IntoIterator for &'a aa_str<A> {
     type Item = A;
     type IntoIter = std::iter::Copied<std::slice::Iter<'a, A>>;
