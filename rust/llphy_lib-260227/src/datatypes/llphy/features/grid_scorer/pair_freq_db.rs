@@ -11,13 +11,29 @@ use std::ops::{Deref, DerefMut};
 /// but it's being officially adopted by this program.
 const PAIR_FREQ_DB_LEN: usize = MAX_XMER + 1;
 /// A struct containing [`PairFreqDBEntry`] for each
-/// `(aa_x, gap_length, aa_y)` key.
+/// `(aa_x, gap_length, xy_orientation, aa_y)` key.
 ///
-/// `gap_length` can be any number in `0..=MAX_XMER`.
-/// The inner array is one longer than an `xmer`-indexable array.
-pub struct PairFreqDB(AAMap<[AAMap<PairFreqDBEntry>; PAIR_FREQ_DB_LEN]>);
-/// Weights for each `(aa_x, gap_length, aa_y)` key.
-/// 
+/// - `xy_orientation` could theoretically be represented by a `bool`
+///   as it is describing whether `aa_x` is N-terminal or C-terminal
+///   of `aa_y`. In practice I just do both so it doesn't matter.
+/// - `gap_length` can be any number in `0..=MAX_XMER`.
+///   The inner array is one longer than an `xmer`-indexable array.
+pub struct PairFreqDB(AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>);
+/// A substructure of [`PairFreqDB`] that organizes entries based
+/// on the `xy_orientation` (whether residue `x` is N-terminal or
+/// C-terminal of `y`).
+pub struct PairFreqSubtable {
+    // If `aa_x` is N-terminal to `aa_y`
+    // (i.e. if `aa_y` is C-terminal to `aa_x`),
+    // index into this field with `aa_y`.
+    pub n_terminal: AAMap<PairFreqDBEntry>,
+    // If `aa_x` is C-terminal to `aa_y`
+    // (i.e. if `aa_y` is N-terminal to `aa_x`),
+    // index into this field with `aa_y`.
+    pub c_terminal: AAMap<PairFreqDBEntry>,
+}
+/// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
+///
 /// Dev note
 /// --------
 /// The reason this contains data for two features instead
@@ -31,7 +47,7 @@ pub struct PairFreqDBEntry {
     pub total_b: f64,
 }
 impl Deref for PairFreqDB {
-    type Target = AAMap<[AAMap<PairFreqDBEntry>; PAIR_FREQ_DB_LEN]>;
+    type Target = AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -46,19 +62,24 @@ impl PairFreqDB {
     pub fn new_nan_filled() -> Self {
         PairFreqDB(AAMap(
             [const {
-                [const { AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]) };
-                    PAIR_FREQ_DB_LEN]
+                [const {
+                    PairFreqSubtable {
+                        n_terminal: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
+                        c_terminal: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
+                    }
+                }; PAIR_FREQ_DB_LEN]
             }; 20],
         ))
     }
     #[cfg(debug_assertions)]
     /// False if there are `f64::NAN`s in any entry.
     pub fn is_nan_free(&self) -> bool {
-        !self
-            .0
-            .values()
-            .flatten()
-            .any(|subtable| subtable.values().any(|e| e.is_nan_free()))
+        !self.0.values().flatten().any(|subtable| {
+            [subtable.n_terminal.values(), subtable.c_terminal.values()]
+                .into_iter()
+                .flatten()
+                .any(|e| e.is_nan_free())
+        })
     }
 }
 impl PairFreqDBEntry {
