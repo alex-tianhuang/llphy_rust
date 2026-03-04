@@ -14,23 +14,21 @@ const PAIR_FREQ_DB_LEN: usize = MAX_XMER + 1;
 /// `(aa_x, gap_length, xy_orientation, aa_y)` key.
 ///
 /// - `xy_orientation` could theoretically be represented by a `bool`
-///   as it is describing whether `aa_x` is N-terminal or C-terminal
-///   of `aa_y`. In practice I just do both so it doesn't matter.
+///   as it is describing whether `aa_y` is N-terminal or C-terminal
+///   of `aa_x`. In practice I just do both so it doesn't matter.
 /// - `gap_length` can be any number in `0..=MAX_XMER`.
 ///   The inner array is one longer than an `xmer`-indexable array.
 pub struct PairFreqDB(AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>);
 /// A substructure of [`PairFreqDB`] that organizes entries based
-/// on the `xy_orientation` (whether residue `x` is N-terminal or
-/// C-terminal of `y`).
+/// on the `xy_orientation` (whether residue `y` is N-terminal or
+/// C-terminal of `x`).
 pub struct PairFreqSubtable {
-    // If `aa_x` is N-terminal to `aa_y`
-    // (i.e. if `aa_y` is C-terminal to `aa_x`),
+    // If `aa_y` is N-terminal to `aa_x`
     // index into this field with `aa_y`.
-    pub n_terminal: AAMap<PairFreqDBEntry>,
-    // If `aa_x` is C-terminal to `aa_y`
-    // (i.e. if `aa_y` is N-terminal to `aa_x`),
+    pub n_terminal_mapping: AAMap<PairFreqDBEntry>,
+    // If `aa_y` is C-terminal to `aa_x`,
     // index into this field with `aa_y`.
-    pub c_terminal: AAMap<PairFreqDBEntry>,
+    pub c_terminal_mapping: AAMap<PairFreqDBEntry>,
 }
 /// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
 ///
@@ -64,8 +62,8 @@ impl PairFreqDB {
             [const {
                 [const {
                     PairFreqSubtable {
-                        n_terminal: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
-                        c_terminal: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
+                        c_terminal_mapping: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
+                        n_terminal_mapping: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
                     }
                 }; PAIR_FREQ_DB_LEN]
             }; 20],
@@ -75,7 +73,7 @@ impl PairFreqDB {
     /// False if there are `f64::NAN`s in any entry.
     pub fn is_nan_free(&self) -> bool {
         !self.0.values().flatten().any(|subtable| {
-            [subtable.n_terminal.values(), subtable.c_terminal.values()]
+            [subtable.c_terminal_mapping.values(), subtable.n_terminal_mapping.values()]
                 .into_iter()
                 .flatten()
                 .any(|e| e.is_nan_free())
