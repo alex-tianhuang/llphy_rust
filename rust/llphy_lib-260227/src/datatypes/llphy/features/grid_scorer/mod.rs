@@ -72,22 +72,22 @@ impl GridScorer<'_> {
         });
         for i in 1..=n_sites {
             let aa = sequence[i];
-            let subseq = self.get_seq_centered_at(sequence, i);
+            let subseq = get_subseq_centered_at(sequence, i);
             debug_assert!(subseq.len() >= 3);
             let all_xmer_scores = self.score_subseq_smart(subseq);
             let avg_sdevs = &self.avg_sdevs[aa];
             let mut outer_total = 0;
             let mut outer_weight_a = 0;
             let mut outer_weight_b = 0;
-            for (xmer, (freq_sr, freq_lr)) in xmer_sizes().zip(all_xmer_scores) {
+            for (xmer, (freq_a, freq_b)) in xmer_sizes().zip(all_xmer_scores) {
                 let AvgSdevDBEntry {
                     avg_a,
                     std_a,
                     avg_b,
                     std_b,
                 } = avg_sdevs[xmer];
-                let zscore_a = (freq_sr - avg_a) / std_a;
-                let zscore_b = (freq_lr - avg_b) / std_b;
+                let zscore_a = (freq_a - avg_a) / std_a;
+                let zscore_b = (freq_b - avg_b) / std_b;
                 let ZGridDBEntry {
                     weight_total,
                     weight_a,
@@ -119,25 +119,12 @@ impl GridScorer<'_> {
             feature_b_scores: feature_b_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
         }
     }
-    /// Try and get a subsequence centered at the given `center` index,
-    /// starting at `MAX_XMER` at shrinking until it fits inside
-    /// the sequence.
-    fn get_seq_centered_at<'a>(
-        &self,
-        sequence: &'a aa_canonical_str,
-        center: usize,
-    ) -> &'a aa_canonical_str {
-        let space_on_left = center;
-        let space_on_right = sequence.len() - 1 - center;
-        let min_space = cmp::min(space_on_left, space_on_right);
-        let xmer = cmp::min(min_space, MAX_XMER);
-        &sequence[center - xmer..center + xmer + 1]
-    }
+    
     /// Get feature `a` and `b` statistics for the given subsequence.
     fn score_subseq_smart<'a>(
         &self,
         subseq: &aa_canonical_str,
-    ) -> impl Iterator<Item = (f64, f64)> {
+    ) -> impl ExactSizeIterator<Item = (f64, f64)> {
         debug_assert!(subseq.len() % 2 == 1);
         let midpoint = subseq.len() / 2;
         debug_assert!(midpoint <= MAX_XMER);
@@ -178,4 +165,18 @@ impl GridScorer<'_> {
             (final_frequency_a, final_frequency_b)
         })
     }
+}
+
+/// Try and get a subsequence centered at the given `center` index,
+/// starting with spans of `MAX_XMER` at shrinking until it fits
+/// inside the sequence.
+fn get_subseq_centered_at(
+    sequence: &aa_canonical_str,
+    center: usize,
+) -> &aa_canonical_str {
+    let space_on_left = center;
+    let space_on_right = sequence.len() - 1 - center;
+    let min_space = cmp::min(space_on_left, space_on_right);
+    let xmer = cmp::min(min_space, MAX_XMER);
+    &sequence[center - xmer..center + xmer + 1]
 }
