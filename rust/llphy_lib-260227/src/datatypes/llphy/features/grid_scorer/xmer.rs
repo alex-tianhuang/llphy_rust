@@ -9,6 +9,7 @@ use crate::datatypes::MAX_XMER;
 pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 /// A newtype wrapper that indicates a number is
 /// in `1..=MAX_XMER`. For [`XmerIndexableArray`].
+#[derive(Clone, Copy)]
 pub struct XmerSize(NonZero<usize>);
 /// Like `1..=MAX_XMER` but returns [`XmerSize`]s.
 pub fn xmer_sizes() -> impl ExactSizeIterator<Item = XmerSize> {
