@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, de::Visitor};
 
-use crate::datatypes::{AMINOACIDS, Aminoacid};
+use crate::datatypes::{AAIndex, AMINOACIDS, Aminoacid};
 use std::{
     fmt::Debug,
     marker::PhantomData,
@@ -62,6 +62,17 @@ impl<T> AAMap<T> {
     /// order of amino acids.
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.0.iter_mut()
+    }
+}
+impl<T> Index<AAIndex> for AAMap<T> {
+    type Output = T;
+    fn index(&self, index: AAIndex) -> &Self::Output {
+        self.0.index(index as usize)
+    }
+}
+impl<T> IndexMut<AAIndex> for AAMap<T> {
+    fn index_mut(&mut self, index: AAIndex) -> &mut Self::Output {
+        self.0.index_mut(index as usize)
     }
 }
 impl<T> Index<Aminoacid> for AAMap<T> {
