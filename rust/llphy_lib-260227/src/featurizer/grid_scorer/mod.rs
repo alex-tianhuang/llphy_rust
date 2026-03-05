@@ -24,12 +24,9 @@ pub struct GridScorer<'a> {
 }
 /// A collection of biophysical feature scores for
 /// each residue in a sequence.
-///
-/// Depending on which feature is to be calculated
-/// there will/won't be a `Some` variant option.
 pub struct GridScore<'a> {
-    pub feature_a_scores: Option<AAMap<&'a [f64]>>,
-    pub feature_b_scores: Option<AAMap<&'a [f64]>>,
+    pub feature_a_scores: AAMap<&'a [f64]>,
+    pub feature_b_scores: AAMap<&'a [f64]>,
 }
 impl GridScorer<'_> {
     /// Turn a sequence into a biophysical feature grid (currently [`GridScore`])
@@ -38,32 +35,26 @@ impl GridScorer<'_> {
     pub fn score_sequence<'a>(
         &self,
         sequence: &aa_canonical_str,
-        include_a: bool,
-        include_b: bool,
         arena: &'a Bump,
     ) -> GridScore<'a> {
         let Some(n_sites) = sequence.len().checked_sub(2) else {
             return GridScore {
-                feature_a_scores: include_a.then(|| AAMap([&[] as _; 20])),
-                feature_b_scores: include_b.then(|| AAMap([&[] as _; 20])),
+                feature_a_scores: AAMap([&[]; 20]),
+                feature_b_scores: AAMap([&[]; 20]),
             };
         };
         let mut trimmed_residue_counts = AAMap::default();
         for aa in &sequence[1..=n_sites] {
             trimmed_residue_counts[aa] += 1;
         }
-        let mut feature_a_scores = include_a.then(|| {
-            AAMap(std::array::from_fn(|aaindex| {
-                let cap = trimmed_residue_counts.0[aaindex];
-                Vec::with_capacity_in(cap, arena)
-            }))
-        });
-        let mut feature_b_scores = include_b.then(|| {
-            AAMap(std::array::from_fn(|aaindex| {
-                let cap = trimmed_residue_counts.0[aaindex];
-                Vec::with_capacity_in(cap, arena)
-            }))
-        });
+        let mut feature_a_scores = AAMap(std::array::from_fn(|aaindex| {
+            let cap = trimmed_residue_counts.0[aaindex];
+            Vec::with_capacity_in(cap, arena)
+        }));
+        let mut feature_b_scores = AAMap(std::array::from_fn(|aaindex| {
+            let cap = trimmed_residue_counts.0[aaindex];
+            Vec::with_capacity_in(cap, arena)
+        }));
         for i in 1..=n_sites {
             let aa = sequence[i];
             let subseq = get_subseq_centered_at(sequence, i);
@@ -83,16 +74,13 @@ impl GridScorer<'_> {
                 let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
                 outer_accumulator += self.z_grid[aa][xmer].lookup::<false>(zscores);
             }
-            if let Some(g) = feature_a_scores.as_mut() {
-                g[aa].push(outer_accumulator.freq_a());
-            }
-            if let Some(g) = feature_b_scores.as_mut() {
-                g[aa].push(outer_accumulator.freq_b());
-            }
+            let [freq_a, freq_b] = outer_accumulator.as_frequencies().to_array();
+            feature_a_scores[aa].push(freq_a);
+            feature_b_scores[aa].push(freq_b);
         }
         GridScore {
-            feature_a_scores: feature_a_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
-            feature_b_scores: feature_b_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
+            feature_a_scores: AAMap(feature_a_scores.0.map(|v| leak_vec(v) as &[_])),
+            feature_b_scores: AAMap(feature_b_scores.0.map(|v| leak_vec(v) as &[_])),
         }
     }
 }

@@ -77,50 +77,36 @@ pub fn featurize<'a, const QUIET: bool>(
             let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
             for (j, entry) in sequences.iter().enumerate() {
-                let scored = grid_scorer.score_sequence(
-                    entry.sequence,
-                    feature_idx_a.is_some(),
-                    feature_idx_b.is_some(),
-                    &per_feature_pair_arena,
-                );
+                let scored = grid_scorer.score_sequence(entry.sequence, &per_feature_pair_arena);
                 py.check_signals()?;
-                if let Some((slot, grid_score)) =
-                    feature_idx_a.zip(scored.feature_a_scores.as_ref())
-                {
+                if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
-                    data[slot] = grid_decoder_a.compute(grid_score);
+                    let value = grid_decoder_a.compute(&scored.feature_a_scores);
+                    debug_assert_ne!(value, UNINIT_SENTINEL);
+                    data[slot] = value;
                 }
-                if let Some((slot, grid_score)) =
-                    feature_idx_b.zip(scored.feature_b_scores.as_ref())
-                {
+                if let Some(slot) = feature_idx_b {
                     let slot = j * row_size + slot;
-                    data[slot] = grid_decoder_b.compute(grid_score);
+                    let value = grid_decoder_b.compute(&scored.feature_b_scores);
+                    debug_assert_ne!(value, UNINIT_SENTINEL);
+                    data[slot] = value;
                 }
                 pbar.inc(1);
             }
             pbar.abandon();
         } else {
             for (j, entry) in sequences.iter().enumerate() {
-                let scored = grid_scorer.score_sequence(
-                    entry.sequence,
-                    feature_idx_a.is_some(),
-                    feature_idx_b.is_some(),
-                    &per_feature_pair_arena,
-                );
+                let scored = grid_scorer.score_sequence(entry.sequence, &per_feature_pair_arena);
                 py.check_signals()?;
-                if let Some((slot, grid_score)) =
-                    feature_idx_a.zip(scored.feature_a_scores.as_ref())
-                {
+                if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
-                    let value = grid_decoder_a.compute(grid_score);
+                    let value = grid_decoder_a.compute(&scored.feature_a_scores);
                     debug_assert_ne!(value, UNINIT_SENTINEL);
                     data[slot] = value;
                 }
-                if let Some((slot, grid_score)) =
-                    feature_idx_b.zip(scored.feature_b_scores.as_ref())
-                {
+                if let Some(slot) = feature_idx_b {
                     let slot = j * row_size + slot;
-                    let value = grid_decoder_b.compute(grid_score);
+                    let value = grid_decoder_b.compute(&scored.feature_b_scores);
                     debug_assert_ne!(value, UNINIT_SENTINEL);
                     data[slot] = value;
                 }
