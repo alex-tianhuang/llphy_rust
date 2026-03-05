@@ -1,6 +1,6 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 use crate::{
-    datatypes::{AAMap, MAX_XMER, aa_canonical_str},
+    datatypes::{AAIndex, AAMap, MAX_XMER},
     leak_vec,
 };
 use bumpalo::{Bump, collections::Vec};
@@ -45,7 +45,7 @@ impl GridScorer<'_> {
     /// centered on each residue type.
     pub fn score_sequence<'a>(
         &self,
-        sequence: &aa_canonical_str,
+        sequence: &[AAIndex],
         arena: &'a Bump,
     ) -> GridScore<'a> {
         let Some(n_sites) = sequence.len().checked_sub(2) else {
@@ -55,7 +55,7 @@ impl GridScorer<'_> {
             };
         };
         let mut trimmed_residue_counts = AAMap::default();
-        for aa in &sequence[1..=n_sites] {
+        for &aa in &sequence[1..=n_sites] {
             trimmed_residue_counts[aa] += 1;
         }
         let mut feature_a_scores = AAMap(std::array::from_fn(|aaindex| {
@@ -101,7 +101,7 @@ impl GridScorer<'_> {
 /// Try and get a subsequence centered at the given `center` index,
 /// starting with spans of `MAX_XMER` at shrinking until it fits
 /// inside the sequence.
-fn get_subseq_centered_at(sequence: &aa_canonical_str, center: usize) -> &aa_canonical_str {
+fn get_subseq_centered_at(sequence: &[AAIndex], center: usize) -> &[AAIndex] {
     let space_on_left = center;
     let space_on_right = sequence.len() - 1 - center;
     let min_space = cmp::min(space_on_left, space_on_right);

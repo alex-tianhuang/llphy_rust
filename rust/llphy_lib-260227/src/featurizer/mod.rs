@@ -11,12 +11,14 @@
 //!
 //! [python package]: https://github.com/julie-forman-kay-lab/LLPhyScore
 use crate::{
-    datatypes::{FastaEntry, FeatureMatrix, find_pair_and_features_from_one_feature_name},
+    datatypes::{
+        Aminoacid, FastaEntry, FeatureMatrix, find_pair_and_features_from_one_feature_name,
+    },
     load_pkg_data::load_grid_scorer,
     pbar::pbar,
 };
 use anyhow::Error;
-use bumpalo::Bump;
+use bumpalo::{Bump, collections::Vec};
 pub use grid_decoder::GridDecoder;
 pub use grid_scorer::GridScorer;
 use pyo3::Python;
@@ -73,11 +75,14 @@ pub fn featurize<'a, const QUIET: bool>(
         // This is me trying my best not to put it on the stack.
         let grid_scorer = per_feature_pair_arena
             .alloc_try_with(|| load_grid_scorer(pair_name, &per_feature_pair_arena))?;
+        let mut sequence_buffer = Vec::new_in(arena);
         if !QUIET {
             let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
             for (j, entry) in sequences.iter().enumerate() {
-                let scored = grid_scorer.score_sequence(entry.sequence, &per_feature_pair_arena);
+                sequence_buffer.clear();
+                sequence_buffer.extend(entry.sequence.into_iter().map(Aminoacid::to_aaindex));
+                let scored = grid_scorer.score_sequence(&sequence_buffer, &per_feature_pair_arena);
                 py.check_signals()?;
                 if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
@@ -96,7 +101,9 @@ pub fn featurize<'a, const QUIET: bool>(
             pbar.abandon();
         } else {
             for (j, entry) in sequences.iter().enumerate() {
-                let scored = grid_scorer.score_sequence(entry.sequence, &per_feature_pair_arena);
+                sequence_buffer.clear();
+                sequence_buffer.extend(entry.sequence.into_iter().map(Aminoacid::to_aaindex));
+                let scored = grid_scorer.score_sequence(&sequence_buffer, &per_feature_pair_arena);
                 py.check_signals()?;
                 if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
