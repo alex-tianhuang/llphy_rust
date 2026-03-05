@@ -8,7 +8,7 @@ pub use z_grid_db::{ZGridDB, ZGridDBEntry, ZGridSubtable};
 
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
-    featurizer::grid_scorer::{avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry},
+    featurizer::grid_scorer::pair_freq_db::PairFreqDBEntry,
     leak_vec,
 };
 mod avg_sdev_db;
@@ -69,97 +69,33 @@ impl GridScorer<'_> {
             let aa = sequence[i];
             let subseq = get_subseq_centered_at(sequence, i);
             debug_assert!(subseq.len() >= 3);
-            let all_xmer_scores = self.score_subseq_smart(subseq);
+            debug_assert!(subseq.len() % 2 == 1);
             let avg_sdevs = &self.avg_sdevs[aa];
-            let mut outer_total = 0;
-            let mut outer_weight_a = 0;
-            let mut outer_weight_b = 0;
-
-            for (xmer, (freq_a, freq_b)) in xmer_sizes().zip(all_xmer_scores) {
-                let AvgSdevDBEntry {
-                    avg_a,
-                    std_a,
-                    avg_b,
-                    std_b,
-                } = avg_sdevs[xmer];
-                let zscore_a = (freq_a - avg_a) / std_a;
-                let zscore_b = (freq_b - avg_b) / std_b;
-                let ZGridDBEntry {
-                    weight_total,
-                    weight_a,
-                    weight_b,
-                } = *self.z_grid[aa][xmer].lookup(zscore_a, zscore_b);
-                outer_total += weight_total;
-                outer_weight_a += weight_a;
-                outer_weight_b += weight_b;
+            let mut outer_accumulator = ZGridDBEntry::new_zeroed();
+            let mut inner_accumulator = PairFreqDBEntry::new_zeroed();
+            let relative_midpoint = subseq.len() / 2;
+            let num_windows = cmp::min(relative_midpoint, MAX_XMER);
+            let pair_freqs = &self.pair_freqs[aa];
+            for (xmer, subtable) in xmer_sizes().take(num_windows).zip(pair_freqs) {
+                let n_term_position = relative_midpoint - xmer.get();
+                inner_accumulator += &subtable.n_terminal_mapping[subseq[n_term_position]];
+                let c_term_position = relative_midpoint + xmer.get();
+                inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
+                let freqs = inner_accumulator.as_frequencies();
+                let [zscore_a, zscore_b] = avg_sdevs[xmer].freqs_to_zscores(freqs);
+                outer_accumulator += self.z_grid[aa][xmer].lookup(zscore_a, zscore_b);
             }
             if let Some(g) = feature_a_scores.as_mut() {
-                let outer_freq_a = if outer_total == 0 {
-                    0.0
-                } else {
-                    outer_weight_a as f64 / outer_total as f64
-                };
-                g[aa].push(outer_freq_a);
+                g[aa].push(outer_accumulator.freq_a());
             }
             if let Some(g) = feature_b_scores.as_mut() {
-                let outer_freq_b = if outer_total == 0 {
-                    0.0
-                } else {
-                    outer_weight_b as f64 / outer_total as f64
-                };
-                g[aa].push(outer_freq_b)
+                g[aa].push(outer_accumulator.freq_b())
             }
         }
         GridScore {
             feature_a_scores: feature_a_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
             feature_b_scores: feature_b_scores.map(|m| AAMap(m.0.map(|v| leak_vec(v) as &[_]))),
         }
-    }
-
-    /// Get feature `a` and `b` statistics for the given subsequence.
-    fn score_subseq_smart<'a>(
-        &self,
-        subseq: &aa_canonical_str,
-    ) -> impl ExactSizeIterator<Item = (f64, f64)> {
-        debug_assert!(subseq.len() % 2 == 1);
-        let midpoint = subseq.len() / 2;
-        debug_assert!(midpoint <= MAX_XMER);
-        let mut weight_sum_a = 0.0;
-        let mut weight_sum_b = 0.0;
-        let mut denom_total_a = 0.0;
-        let mut denom_total_b = 0.0;
-        let aa = subseq[midpoint];
-        let cap = cmp::min(midpoint, MAX_XMER);
-        let pair_freqs = &self.pair_freqs[aa];
-        (0..cap).map(move |p| {
-            let xmer = p + 1;
-            let pair_freqs_subtable = &pair_freqs[p];
-            let n_term_position = midpoint - xmer;
-            let PairFreqDBEntry {
-                weight_a,
-                weight_b,
-                total_a,
-                total_b,
-            } = pair_freqs_subtable.n_terminal_mapping[subseq[n_term_position]];
-            weight_sum_a += weight_a;
-            weight_sum_b += weight_b;
-            denom_total_a += total_a;
-            denom_total_b += total_b;
-            let c_term_position = midpoint + xmer;
-            let PairFreqDBEntry {
-                weight_a,
-                weight_b,
-                total_a,
-                total_b,
-            } = pair_freqs_subtable.c_terminal_mapping[subseq[c_term_position]];
-            weight_sum_a += weight_a;
-            weight_sum_b += weight_b;
-            denom_total_a += total_a;
-            denom_total_b += total_b;
-            let final_frequency_a = weight_sum_a / denom_total_a;
-            let final_frequency_b = weight_sum_b / denom_total_b;
-            (final_frequency_a, final_frequency_b)
-        })
     }
 }
 

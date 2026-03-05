@@ -1,6 +1,7 @@
 //! Module defining [`PairFreqDB`].
 use crate::datatypes::{AAMap, MAX_XMER};
-use std::ops::{Deref, DerefMut};
+use std::ops::{AddAssign, Deref, DerefMut};
+use std::simd::{f64x4, f64x2};
 
 /// The number of `gap_length`-indexable tables in a [`PairFreqDB`].
 ///
@@ -31,19 +32,23 @@ pub struct PairFreqSubtable {
     pub c_terminal_mapping: AAMap<PairFreqDBEntry>,
 }
 /// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
+/// 
+/// The field names are not visible in the SIMD representation,
+/// but it is essentially an array consisting of named floats
+/// [`weight_a`], [`weight_b`], [`total_a`], and [`total_b`].
 ///
+/// [`weight_a`]: Self::weight_a
+/// [`weight_b`]: Self::weight_b
+/// [`total_a`]: Self::total_a
+/// [`total_b`]: Self::total_b
+/// 
 /// Dev note
 /// --------
 /// The reason this contains data for two features instead
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`super::ZGridDB`] and so it is a
 /// win for cache locality to get them loaded in one struct.
-pub struct PairFreqDBEntry {
-    pub weight_a: f64,
-    pub total_a: f64,
-    pub weight_b: f64,
-    pub total_b: f64,
-}
+pub struct PairFreqDBEntry(f64x4);
 impl Deref for PairFreqDB {
     type Target = AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>;
     fn deref(&self) -> &Self::Target {
@@ -79,20 +84,53 @@ impl PairFreqDB {
         })
     }
 }
+
+/// Shorthand for associating each index of the
+/// array of [`PairFreqDBEntry`] with a named field.
+macro_rules! impl_getters {
+    ($([$index:literal, $field:ident]),*) => {
+        impl PairFreqDBEntry {
+            $(pub fn $field(&self) -> f64 {
+                self.0.as_array()[$index]
+            })*
+        }
+    };
+}
+impl_getters!([0, weight_a], [1, weight_b], [2, total_a], [3, total_b]);
 impl PairFreqDBEntry {
     /// Get a new [`PairFreqDBEntry`] that is filled with `f64::NAN`.
     const fn new_nan_filled() -> Self {
-        Self {
-            weight_a: f64::NAN,
-            total_a: f64::NAN,
-            weight_b: f64::NAN,
-            total_b: f64::NAN,
-        }
+        Self(f64x4::from_array([f64::NAN; 4]))
     }
     /// False if there are `f64::NAN`s in any field.
     pub fn is_nan_free(&self) -> bool {
-        [self.weight_a, self.weight_b, self.total_a, self.total_b]
+        self.0.as_array()
             .into_iter()
             .all(|x| !x.is_nan())
+    }
+    /// Get a new [`PairFreqDBEntry`] that is filled with `0.0_f64`.
+    pub fn new_zeroed() -> Self {
+        Self(f64x4::from_array([0.0; 4]))
+    }
+    /// Set weights and total for feature `A`.
+    pub fn set_a(&mut self, weight: f64, total: f64) {
+        let this = self.0.as_mut_array();
+        this[0] = weight;
+        this[2] = total;
+    }
+    /// Set weights and total for feature `B`.
+    pub fn set_b(&mut self, weight: f64, total: f64) {
+        let this = self.0.as_mut_array();
+        this[1] = weight;
+        this[3] = total;
+    }
+    /// Equivalent to `f64x2::from_array([self.weight_a() / self.total_a(), self.weight_b() / self.total_b()])`.
+    pub fn as_frequencies(&self) -> f64x2 {
+        self.0.extract::<0, 2>() / self.0.extract::<2, 2>()
+    }
+}
+impl AddAssign<&Self> for PairFreqDBEntry {
+    fn add_assign(&mut self, rhs: &Self) {
+        self.0 += &rhs.0
     }
 }

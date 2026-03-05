@@ -146,12 +146,10 @@ fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Err
             // If the tag names are wrong, the debug assertion
             // `pair_freq_db.is_nan_free()` will fail.
             if tags[0] == tag {
-                target.weight_a = weight;
-                target.total_a = total;
+                target.set_a(weight, total);
             }
             if tags[1] == tag {
-                target.weight_b = weight;
-                target.total_b = total;
+                target.set_b(weight, total);
             }
         }
     }
@@ -205,16 +203,7 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
                     (
                         k.0,
                         &*arena.alloc_slice_fill_iter(entryl3.into_iter().map(
-                            |(k, [weight_total, weight_a, weight_b])| {
-                                (
-                                    k.0,
-                                    ZGridDBEntry {
-                                        weight_total,
-                                        weight_a,
-                                        weight_b,
-                                    },
-                                )
-                            },
+                            |(k, [weight_total, weight_a, weight_b])| ZGridDBEntry::from_parts(k.0, weight_total, weight_a, weight_b),
                         )),
                     )
                 }),
@@ -267,26 +256,30 @@ fn load_one_xmer_avg_sdev_into_target(
 
         let mut parts = rest.trim_ascii_start().split_ascii_whitespace();
         let entry = &mut target[aa][xmer];
-        for target in [
-            [&mut entry.avg_a, &mut entry.std_a],
-            [&mut entry.avg_b, &mut entry.std_b],
-        ] {
-            let _ = parts
-                .next()
-                .ok_or_else(|| fail_on_line_with_msg!("expected a string", line))?;
-            *target[0] = parts
-                .next()
-                .ok_or_else(|| fail_on_line_with_msg!("expected an average (float)", line))?
-                .parse::<f64>()
-                .map_err(map_err_on_line!(line))?;
-            *target[1] = parts
-                .next()
-                .ok_or_else(|| {
-                    fail_on_line_with_msg!("expected an standard deviation (float)", line)
-                })?
-                .parse::<f64>()
-                .map_err(map_err_on_line!(line))?;
+        /// Shorthand for parsing fields associated with feature `A` and then feature `B`.
+        macro_rules! parse_ab_fields {
+            ($entry:ident, $parts:ident, $($method:ident),*) => {{
+                $(let _ = $parts
+                    .next()
+                    .ok_or_else(|| fail_on_line_with_msg!("expected a string", line))?;
+                let avg = $parts
+                    .next()
+                    .ok_or_else(|| fail_on_line_with_msg!("expected an average (float)", line))?
+                    .parse::<f64>()
+                    .map_err(map_err_on_line!(line))?;
+                let std = $parts
+                    .next()
+                    .ok_or_else(|| {
+                        fail_on_line_with_msg!("expected an standard deviation (float)", line)
+                    })?
+                    .parse::<f64>()
+                    .map_err(map_err_on_line!(line))?;
+                let invstd = 1.0 / std;
+                debug_assert!(invstd.is_finite());
+                entry.$method(avg, invstd);)*
+            }};
         }
+        parse_ab_fields!(entry, parts, set_a, set_b);
     }
     Ok(())
 }

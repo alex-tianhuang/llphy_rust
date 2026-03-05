@@ -1,7 +1,8 @@
 //! Module defining [`ZGridDB`].
-use std::ops::{Deref, DerefMut};
+use std::ops::{AddAssign, Deref, DerefMut};
 use crate::datatypes::AAMap;
 use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
+use std::simd::i64x4;
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -15,14 +16,22 @@ pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 ///
 /// For quick lookup, the two layers of slices are expected to be
 /// sorted by `f64`, the `gridpoint`s associated to each index.
-pub struct ZGridSubtable<'a>(&'a [(f64, &'a [(f64, ZGridDBEntry)])]);
+pub struct ZGridSubtable<'a>(&'a [(f64, &'a [ZGridDBEntry])]);
 /// Weights for features `a` and `b`,
 /// for each `(aa, xmer, zscore_a, zscore_b)` tuple.
-pub struct ZGridDBEntry {
-    pub weight_total: i64,
-    pub weight_a: i64,
-    pub weight_b: i64,
-}
+/// 
+/// The field names are not visible in the SIMD representation,
+/// but it is essentially an array consisting of named integers
+/// [`weight_total`], [`weight_a`], and [`weight_b`].
+/// 
+/// [`gridpoint`] (due to SIMD needing four slots) must be
+/// represented as a integer but is actually an `f64`.
+/// 
+/// [`gridpoint`]: Self::gridpoint
+/// [`weight_total`]: Self::weight_total
+/// [`weight_a`]: Self::weight_a
+/// [`weight_b`]: Self::weight_b
+pub struct ZGridDBEntry(i64x4);
 impl<'a> Deref for ZGridDB<'a> {
     type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;
     fn deref(&self) -> &Self::Target {
@@ -46,7 +55,7 @@ impl<'a> ZGridSubtable<'a> {
         Self(&mut [])
     }
     /// Make a new [`ZGridSubtable`] with the given data.
-    pub fn new(data: &'a [(f64, &'a [(f64, ZGridDBEntry)])]) -> Self {
+    pub fn new(data: &'a [(f64, &'a [ZGridDBEntry])]) -> Self {
         Self(data)
     }
     /// Get the entry best associated with the
@@ -69,9 +78,9 @@ impl<'a> ZGridSubtable<'a> {
             .ok()?;
         let (_, ref subarr) = self.0[i];
         let j = subarr
-            .binary_search_by(|probe| probe.0.total_cmp(&key_b))
+            .binary_search_by(|probe| probe.gridpoint().total_cmp(&key_b))
             .ok()?;
-        Some(&subarr[j].1)
+        Some(&subarr[j])
     }
     /// Find the gridpoint that minimizes the sum of squared
     /// differences to the given zscores.
@@ -126,10 +135,10 @@ impl<'a> ZGridSubtable<'a> {
             let (_, ref subarr) = self.0[i];
             debug_assert!(!subarr.is_empty());
             let (Ok(j) | Err(j)) =
-                subarr.binary_search_by(|(gridpoint, _)| gridpoint.total_cmp(&zscore_b));
+                subarr.binary_search_by(|entry| entry.gridpoint().total_cmp(&zscore_b));
             let mut check_j = |j: usize| {
-                if let Some((gridpoint, _)) = subarr.get(j) {
-                    let delta_b = *gridpoint - zscore_b;
+                if let Some(entry) = subarr.get(j) {
+                    let delta_b = entry.gridpoint() - zscore_b;
                     let sqr_delta_b = delta_b * delta_b;
                     let sqr_delta = sqr_delta_a + sqr_delta_b;
                     let new_best: bool;
@@ -139,7 +148,7 @@ impl<'a> ZGridSubtable<'a> {
                         new_best = true;
                     }
                     if new_best {
-                        best_entry = Some((sqr_delta, &subarr[j].1))
+                        best_entry = Some((sqr_delta, &subarr[j]))
                     }
                 }
             };
@@ -150,6 +159,57 @@ impl<'a> ZGridSubtable<'a> {
             check_j(j);
         }
         best_entry.unwrap().1
+    }
+}
+/// Shorthand for associating each index of the
+/// array of [`ZGridDBEntry`] with a named field.
+macro_rules! impl_getters {
+    ($([$index:literal, $field:ident]),*) => {
+        impl ZGridDBEntry {
+            $(pub fn $field(&self) -> i64 {
+                self.0.as_array()[$index]
+            })*
+        }
+    };
+}
+impl_getters!([1, weight_total], [2, weight_a], [3, weight_b]);
+impl ZGridDBEntry {
+    /// Get the z-score value of feature `B`
+    /// that this entry is associated with.
+    pub fn gridpoint(&self) -> f64 {
+        // SAFETY: yes, this the 0 slot of this struct is reserved for a float.
+        unsafe { std::mem::transmute::<i64, f64>(self.0.as_array()[0]) }
+    }
+    /// Get a new [`ZGridDBEntry`] with all `0.0_f64`.
+    pub fn new_zeroed() -> Self {
+        Self(i64x4::from_array([0; 4]))
+    }
+    /// Get a new [`ZGridDBEntry`] from its four fields.
+    pub fn from_parts(gridpoint: f64, weight_total: i64, weight_a: i64, weight_b: i64) -> Self {
+        // SAFETY: yes, this the 0 slot of this struct is reserved for a float.
+        let gridpoint = unsafe { std::mem::transmute::<f64, i64>(gridpoint)};
+        Self(i64x4::from_array([gridpoint, weight_total, weight_a, weight_b]))
+    }
+    /// Utility method for [`super::GridScorer::score_sequence`].
+    pub fn freq_a(&self) -> f64 {
+        if self.weight_total() == 0 {
+            0.0
+        } else {
+            self.weight_a() as f64 / self.weight_total() as f64
+        }
+    }
+    /// Utility method for [`super::GridScorer::score_sequence`].
+    pub fn freq_b(&self) -> f64 {
+        if self.weight_total() == 0 {
+            0.0
+        } else {
+            self.weight_b() as f64 / self.weight_total() as f64
+        }
+    }
+}
+impl AddAssign<&Self> for ZGridDBEntry {
+    fn add_assign(&mut self, rhs: &Self) {
+        self.0 += &rhs.0;
     }
 }
 /// Snap a `zscore` to the grid (half-integers).

@@ -1,3 +1,4 @@
+#![feature(portable_simd)]
 //! A library for computing phase separation propensity
 //! and related biophysical features of sequences.
 //!
