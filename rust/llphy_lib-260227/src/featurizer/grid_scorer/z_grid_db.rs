@@ -2,7 +2,7 @@
 use crate::datatypes::AAMap;
 use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
 use std::ops::{AddAssign, Deref, DerefMut};
-use std::simd::{f64x2, i64x4, StdFloat, num::SimdFloat};
+use std::simd::{f64x2, i64x4, i64x2, StdFloat, num::{SimdFloat, SimdInt}};
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -35,15 +35,13 @@ pub struct ZGridSubtable<'a> {
 ///
 /// The field names are not visible in the SIMD representation,
 /// but 3/4 of the struct is an array consisting of named integers
-/// [`weight_total`], [`weight_a`], and [`weight_b`].
+/// [`weight_total`] (which has a method) and then `weight_a` and `weight_b`.
 ///
 /// The remaining integer array slot is for [`Self::is_occupied`],
 /// which is a boolean that checks if this field contains
 /// valid weight data.
 ///
 /// [`weight_total`]: Self::weight_total
-/// [`weight_a`]: Self::weight_a
-/// [`weight_b`]: Self::weight_b
 #[derive(Clone, Copy)]
 pub struct ZGridDBEntry(i64x4);
 impl<'a> Deref for ZGridDB<'a> {
@@ -239,7 +237,7 @@ macro_rules! impl_getters {
         }
     };
 }
-impl_getters!([1, weight_total], [2, weight_a], [3, weight_b]);
+impl_getters!([1, weight_total]);
 impl ZGridDBEntry {
     /// True if this memory location is occupied
     /// with valid/initialized weight data.
@@ -255,19 +253,11 @@ impl ZGridDBEntry {
         Self(i64x4::from_array([1, weight_total, weight_a, weight_b]))
     }
     /// Utility method for [`super::GridScorer::score_sequence`].
-    pub fn freq_a(&self) -> f64 {
+    pub fn as_frequencies(&self) -> f64x2 {
         if self.weight_total() == 0 {
-            0.0
+            f64x2::splat(0.0)
         } else {
-            self.weight_a() as f64 / self.weight_total() as f64
-        }
-    }
-    /// Utility method for [`super::GridScorer::score_sequence`].
-    pub fn freq_b(&self) -> f64 {
-        if self.weight_total() == 0 {
-            0.0
-        } else {
-            self.weight_b() as f64 / self.weight_total() as f64
+            self.0.extract::<2, 2>().cast::<f64>() / i64x2::splat(self.weight_total()).cast::<f64>()
         }
     }
 }
