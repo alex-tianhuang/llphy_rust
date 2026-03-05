@@ -69,7 +69,6 @@ impl GridScorer<'_> {
             let subseq = get_subseq_centered_at(sequence, i);
             debug_assert!(subseq.len() >= 3);
             debug_assert!(subseq.len() % 2 == 1);
-            let avg_sdevs = &self.avg_sdevs[aa];
             let mut outer_accumulator = ZGridDBEntry::new_zeroed();
             let mut inner_accumulator = PairFreqDBEntry::new_zeroed();
             let relative_midpoint = subseq.len() / 2;
@@ -81,7 +80,7 @@ impl GridScorer<'_> {
                 let c_term_position = relative_midpoint + xmer.get();
                 inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
-                let zscores = avg_sdevs[xmer].freqs_to_zscores(freqs);
+                let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
                 outer_accumulator += self.z_grid[aa][xmer].lookup::<false>(zscores);
             }
             if let Some(g) = feature_a_scores.as_mut() {
