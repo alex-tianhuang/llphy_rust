@@ -177,8 +177,7 @@ impl ZGridDBEntry {
     /// Get the z-score value of feature `B`
     /// that this entry is associated with.
     pub fn gridpoint(&self) -> f64 {
-        // SAFETY: yes, this the 0 slot of this struct is reserved for a float.
-        unsafe { std::mem::transmute::<i64, f64>(self.0.as_array()[0]) }
+        f64::from_bits(self.0.as_array()[0].cast_unsigned())
     }
     /// Get a new [`ZGridDBEntry`] with all `0.0_f64`.
     pub fn new_zeroed() -> Self {
@@ -186,8 +185,7 @@ impl ZGridDBEntry {
     }
     /// Get a new [`ZGridDBEntry`] from its four fields.
     pub fn from_parts(gridpoint: f64, weight_total: i64, weight_a: i64, weight_b: i64) -> Self {
-        // SAFETY: yes, this the 0 slot of this struct is reserved for a float.
-        let gridpoint = unsafe { std::mem::transmute::<f64, i64>(gridpoint)};
+        let gridpoint = f64::to_bits(gridpoint).cast_signed();
         Self(i64x4::from_array([gridpoint, weight_total, weight_a, weight_b]))
     }
     /// Utility method for [`super::GridScorer::score_sequence`].
