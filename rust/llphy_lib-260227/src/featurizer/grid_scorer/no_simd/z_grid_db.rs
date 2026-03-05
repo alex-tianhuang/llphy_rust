@@ -1,9 +1,7 @@
 //! Module defining substructures of [`crate::featurizer::grid_scorer::ZGridDB`]
 //! without using `#[portable_simd]`.
-use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
-use crate::{datatypes::AAMap, featurizer::grid_scorer::z_grid_db::lookup_thorough};
-use std::ops::{AddAssign, Deref, DerefMut};
-
+use crate::featurizer::grid_scorer::z_grid_db::lookup_thorough;
+use std::ops::AddAssign;
 
 /// A `(zscore_a, zscore_b)`-indexable collection of weights
 /// for features `a` and `b`.
@@ -97,7 +95,7 @@ impl<'a> ZGridSubtable<'a> {
 }
 impl ZGridDBEntry {
     /// Get a new, occupied [`ZGridDBEntry`] from its three fields.
-    /// 
+    ///
     /// This returns an option so that the [`crate::load_pkg_data::load_grid_scorer`]
     /// function looks a little nicer between simd and no-simd.
     pub fn new_occupied(weight_total: i64, weight_a: i64, weight_b: i64) -> Option<Self> {
@@ -108,7 +106,7 @@ impl ZGridDBEntry {
         })
     }
     /// Make a new unoccupied [`ZGridDBEntry`].
-    /// 
+    ///
     /// This returns an option so that the [`crate::load_pkg_data::load_grid_scorer`]
     /// function looks a little nicer between simd and no-simd.
     pub const fn unoccupied() -> Option<Self> {
