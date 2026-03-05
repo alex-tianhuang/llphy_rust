@@ -7,6 +7,7 @@
 //!
 //! [python library]: https://github.com/julie-forman-kay-lab/LLPhyScore
 use std::{
+    env::args_os,
     mem::{self, ManuallyDrop},
     path::PathBuf,
 };
@@ -63,11 +64,22 @@ pub struct Args {
 }
 #[pymodule(name = "_rust")]
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(main_cli, m)?)?;
     m.add_function(wrap_pyfunction!(run_fasta_scorer, m)?)?;
     Ok(())
 }
+/// Entry point for the `cli` that computes biophysical features.
+/// 
+/// Wrapper around the library function [`run_fasta_scorer`].
+#[pyfunction]
+fn main_cli(py: Python) -> Result<(), Error> {
+    // For some reason `args_os()` gets an extra copy
+    // of argument 0 so we skip that.
+    let args = Args::parse_from(args_os().skip(1));
+    run_fasta_scorer(py, args)
+}
 /// Loads sequences from `args.input_file`,
-/// computes biophysical feature grids and then
+/// computes biophysical feature vectors and then
 /// computes the phase separation propensity,
 /// reporting it to `args.output_file`.
 ///
@@ -80,7 +92,7 @@ fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// IO
 /// --
-/// This function calls [`read_fasta`] and [`seqs_to_grids`],
+/// This function calls [`read_fasta`] and [`featurize`],
 /// which both touch the stderr output. It also prints one message to stderr.
 #[pyfunction]
 fn run_fasta_scorer(py: Python, args: Args) -> Result<(), Error> {
