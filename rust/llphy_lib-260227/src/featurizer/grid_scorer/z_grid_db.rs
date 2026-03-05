@@ -2,7 +2,7 @@
 use crate::datatypes::AAMap;
 use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
 use std::ops::{AddAssign, Deref, DerefMut};
-use std::simd::{f64x2, i64x4};
+use std::simd::{f64x2, i64x4, StdFloat, num::SimdFloat};
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -101,10 +101,8 @@ impl<'a> ZGridSubtable<'a> {
     fn lookup_quick(&self, dbl_zscores: f64x2) -> Option<&ZGridDBEntry> {
         // Bounds derived from Cai's `make_linekey`
         // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores
-            .to_array()
-            .map(|dbl_z| dbl_z.round().clamp(-16.0, 24.0));
-        let [idx_a, idx_b] = (f64x2::from_array(clamped_zscores) - self.dbl_z_offsets).to_array();
+        let clamped_zscores = dbl_zscores.round().simd_clamp(f64x2::splat(-16.0), f64x2::splat(24.0));
+        let [idx_a, idx_b] = (clamped_zscores - self.dbl_z_offsets).to_array();
         if idx_a < 0.0 || idx_b < 0.0 {
             return None;
         }
