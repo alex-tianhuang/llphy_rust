@@ -1,8 +1,9 @@
 //! Module defining [`ZGridDB`].
-use std::ops::{AddAssign, Deref, DerefMut};
-use crate::datatypes::AAMap;
 use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
-use std::simd::{i64x4, f64x2};
+use crate::{datatypes::AAMap, featurizer::grid_scorer};
+use std::io::Read;
+use std::ops::{AddAssign, Deref, DerefMut};
+use std::simd::{f64x2, i64x4};
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -28,19 +29,20 @@ pub struct ZGridSubtable<'a> {
     /// or equivalently the number of half-integers
     /// in the range of valid `zscore_b`s.
     row_len: usize,
-    data: &'a [ZGridDBEntry]
+    data: &'a [ZGridDBEntry],
+    ___DEBUG_TABLE: grid_scorer::z_grid_db::ZGridSubtable<'a>,
 }
 /// A possibly occupied slot for weights for features `a` and `b`,
 /// for some `(aa, xmer, zscore_a, zscore_b)` tuples.
-/// 
+///
 /// The field names are not visible in the SIMD representation,
 /// but 3/4 of the struct is an array consisting of named integers
 /// [`weight_total`], [`weight_a`], and [`weight_b`].
-/// 
+///
 /// The remaining integer array slot is for [`Self::is_occupied`],
 /// which is a boolean that checks if this field contains
 /// valid weight data.
-/// 
+///
 /// [`weight_total`]: Self::weight_total
 /// [`weight_a`]: Self::weight_a
 /// [`weight_b`]: Self::weight_b
@@ -69,31 +71,82 @@ impl<'a> ZGridSubtable<'a> {
         Self {
             dbl_z_offsets: f64x2::from_array([f64::NAN; 2]),
             row_len: 0,
-            data: &[]
+            data: &[],
+            ___DEBUG_TABLE: grid_scorer::z_grid_db::ZGridSubtable::placeholder(),
         }
     }
     /// Make a new [`ZGridSubtable`] with the given data.
     pub fn new(
         dbl_z_offsets: f64x2,
         row_len: usize,
-        data: &'a [ZGridDBEntry]
+        data: &'a [ZGridDBEntry],
+        ___DEBUG_TABLE: grid_scorer::z_grid_db::ZGridSubtable<'a>,
     ) -> Self {
         Self {
             dbl_z_offsets,
             row_len,
-            data
+            data,
+            ___DEBUG_TABLE,
         }
     }
     /// Get the entry best associated with the given `zscores`.
-    /// 
+    ///
     /// It is assumed that the two floats represent the zscore
     /// for feature `A` and `B` respectively.
-    pub fn lookup(&self, zscores: f64x2) -> &ZGridDBEntry {
+    pub fn lookup<const D: bool>(&self, zscores: f64x2) -> &ZGridDBEntry {
         let dbl_zscores = zscores * f64x2::splat(2.0);
+        let [a, b] = zscores.to_array();
+        let DEBUG_REF = self.___DEBUG_TABLE.lookup::<D>(a, b);
         if let Some(entry) = self.lookup_quick(dbl_zscores) {
+            let [_, a, b, c] = entry.0.to_array();
+            assert_eq!(
+                [
+                    DEBUG_REF.weight_total(),
+                    DEBUG_REF.weight_a(),
+                    DEBUG_REF.weight_b()
+                ],
+                [a, b, c],
+                "{:?}",
+                zscores
+            );
             entry
         } else {
-            self.lookup_thorough(dbl_zscores)
+            let e = self.lookup_thorough::<D>(dbl_zscores);
+            let [_, a, b, c] = e.0.to_array();
+            
+            if [DEBUG_REF.weight_total(), DEBUG_REF.weight_a(), DEBUG_REF.weight_b()] != [a, b, c] {
+                let offset = (e as *const ZGridDBEntry as usize - self.data.as_ptr() as usize)
+                    / size_of::<ZGridDBEntry>();
+                let b_gp =
+                    ((offset % self.row_len) as f64 + self.dbl_z_offsets.as_array()[1]) / 2.0;
+                let a_gp =
+                    ((offset / self.row_len) as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0;
+                let a_gp_dbg = self
+                    .___DEBUG_TABLE
+                    .0
+                    .iter()
+                    .find(|t| {
+                        t.1.iter()
+                            .any(|t| std::ptr::addr_eq(t as *const _, DEBUG_REF as *const _))
+                    })
+                    .unwrap()
+                    .0;
+                let b_gp_dbg = DEBUG_REF.gridpoint();
+                eprintln!(
+                    "NEW TABLE FETCHED [a={}, b={}], OLD TABLE FETCHED [a={}, b={}]",
+                    a_gp, b_gp, a_gp_dbg, b_gp_dbg
+                );
+                let [za, zb] = dbl_zscores
+            .to_array()
+            .map(|dbl_z| dbl_z.round().clamp(-16.0, 24.0));
+                eprintln!(
+                    "REQUEST WAS [a={}, b={}]",
+                    za / 2.0, zb / 2.0
+                );
+                std::io::stdin().lock().read(&mut [0]).unwrap();
+            }
+            
+            e
         }
     }
     /// The number of half-integers in the range of valid `zscore_a`s.
@@ -105,34 +158,61 @@ impl<'a> ZGridSubtable<'a> {
     fn lookup_quick(&self, dbl_zscores: f64x2) -> Option<&ZGridDBEntry> {
         // Clamp bounds derived from Cai's `make_linekey`
         // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores.to_array().map(|dbl_z| dbl_z.round().clamp(-16.0, 24.0));
+        let clamped_zscores = dbl_zscores
+            .to_array()
+            .map(|dbl_z| dbl_z.round().clamp(-16.0, 24.0));
         let [idx_a, idx_b] = (f64x2::from_array(clamped_zscores) - self.dbl_z_offsets).to_array();
         if idx_a < 0.0 || idx_b < 0.0 {
             return None;
         }
         let idx_a = idx_a as usize;
         let idx_b = idx_b as usize;
-        let row = self.data.get(self.row_len * idx_a..self.row_len * (idx_a + 1))?;
+        let row = self
+            .data
+            .get(self.row_len * idx_a..self.row_len * (idx_a + 1))?;
         let entry = row.get(idx_b)?;
         entry.is_occupied().then_some(entry)
     }
     /// Find the gridpoint that minimizes the sum of squared
     /// differences to the given zscores.
-    fn lookup_thorough(&self, dbl_zscores: f64x2) -> &ZGridDBEntry {
+    fn lookup_thorough<const D: bool>(&self, dbl_zscores: f64x2) -> &ZGridDBEntry {
         // z-star = (z * 2 - self.dbl_z_offsets);
         let [z_star_a, z_star_b] = (dbl_zscores - self.dbl_z_offsets).to_array();
         let mut best_entry: Option<(f64, &ZGridDBEntry)> = None;
-        let start_index_a = (z_star_a as usize).min(self.column_len() - 1);
+        let start_index_a = (z_star_a as usize + 1).min(self.column_len());
         // I assume this gets optimized out
         let to_sqr_delta_a = |x: usize| {
             let delta_a = x as f64 - z_star_a;
             delta_a * delta_a
         };
-        let next_search_down =
-            |idx: usize| idx.checked_sub(1).map(|idx| (idx, to_sqr_delta_a(idx)));
+        let next_search_down = {
+            |idx: usize| {
+                if D {
+                    eprintln!(
+                        "[NEW TABLE] decrementing a-pointer down to [a={:?}]",
+                        idx.checked_sub(1)
+                            .map(|idx| (idx as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0)
+                    );
+                }
+                idx.checked_sub(1).map(|idx| (idx, to_sqr_delta_a(idx)))
+            }
+        };
         let next_search_up = |idx: usize| {
+            if D {
+                eprintln!(
+                    "[NEW TABLE] incrementing a-pointer up to [a={}]",
+                    (idx as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0
+                );
+            }
             (idx < self.column_len()).then(|| (idx, to_sqr_delta_a(idx)))
         };
+        if D {
+            eprintln!(
+                "[NEW TABLE] beginning search: [a={}] [zscs={:?}]",
+                (start_index_a as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0,
+                dbl_zscores / f64x2::splat(2.0)
+            );
+        }
         let mut down_search = next_search_down(start_index_a);
         let mut up_search = next_search_up(start_index_a);
         debug_assert!(self.column_len() > 0);
@@ -159,12 +239,28 @@ impl<'a> ZGridSubtable<'a> {
             };
             if let Some((best_sqr_delta, entry)) = best_entry {
                 if best_sqr_delta <= sqr_delta_a {
+                    if D {
+                        eprintln!("[NEW TABLE] search done")
+                    }
                     return entry;
                 }
+            }
+            if D {
+                eprintln!(
+                    "[NEW TABLE] beginning row search: [a={}]",
+                    (idx_a as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0
+                );
             }
             let row = &self.data[idx_a * self.row_len..(idx_a + 1) * self.row_len];
             debug_assert!(!row.is_empty());
             let mut check_idx_b = |idx_b: usize| {
+                if D {
+                    eprintln!(
+                        "[NEW TABLE] row search checking over [a={}, b={}]",
+                        (idx_a as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0,
+                        (idx_b as f64 + self.dbl_z_offsets.as_array()[1]) / 2.0
+                    );
+                }
                 let delta_b = idx_b as f64 - z_star_b;
                 let sqr_delta_b = delta_b * delta_b;
                 let sqr_delta = sqr_delta_a + sqr_delta_b;
@@ -175,6 +271,13 @@ impl<'a> ZGridSubtable<'a> {
                     new_best = true;
                 }
                 if new_best {
+                    if D {
+                        eprintln!(
+                            "[NEW TABLE] new best [a={}, b={}]",
+                            (idx_a as f64 + self.dbl_z_offsets.as_array()[0]) / 2.0,
+                            (idx_b as f64 + self.dbl_z_offsets.as_array()[1]) / 2.0
+                        );
+                    }
                     best_entry = Some((sqr_delta, &row[idx_b]))
                 }
             };
@@ -185,10 +288,8 @@ impl<'a> ZGridSubtable<'a> {
             };
             let next_search_down =
                 |idx: usize| idx.checked_sub(1).map(|idx| (idx, to_abs_delta_b(idx)));
-            let next_search_up = |idx: usize| {
-                (idx < row.len()).then(|| (idx, to_abs_delta_b(idx)))
-            };
-            let start_index_b = (z_star_b as usize).min(self.row_len - 1);
+            let next_search_up = |idx: usize| (idx < row.len()).then(|| (idx, to_abs_delta_b(idx)));
+            let start_index_b = (z_star_b as usize + 1).min(self.row_len);
             let mut down_search = next_search_down(start_index_b);
             let mut up_search = next_search_up(start_index_b);
             loop {
@@ -207,13 +308,13 @@ impl<'a> ZGridSubtable<'a> {
                                 up_search = None
                             }
                         }
-                        continue
+                        continue;
                     }
                     (None, Some((up_ptr, _))) => {
                         for idx_b in up_ptr..row.len() {
                             if row[idx_b].is_occupied() {
                                 check_idx_b(idx_b);
-                                break
+                                break;
                             }
                         }
                     }
@@ -221,13 +322,13 @@ impl<'a> ZGridSubtable<'a> {
                         for idx_b in (0..=down_ptr).rev() {
                             if row[idx_b].is_occupied() {
                                 check_idx_b(idx_b);
-                                break
+                                break;
                             }
                         }
                     }
                     (None, None) => (),
                 };
-                break
+                break;
             }
         }
         best_entry.unwrap().1

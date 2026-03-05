@@ -16,7 +16,7 @@ pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 ///
 /// For quick lookup, the two layers of slices are expected to be
 /// sorted by `f64`, the `gridpoint`s associated to each index.
-pub struct ZGridSubtable<'a>(&'a [(f64, &'a [ZGridDBEntry])]);
+pub struct ZGridSubtable<'a>(pub(crate) &'a [(f64, &'a [ZGridDBEntry])]);
 /// Weights for features `a` and `b`,
 /// for each `(aa, xmer, zscore_a, zscore_b)` tuple.
 /// 
@@ -60,11 +60,11 @@ impl<'a> ZGridSubtable<'a> {
     }
     /// Get the entry best associated with the
     /// given `zscore`s for features `a` and `b`.
-    pub fn lookup(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {
+    pub fn lookup<const D: bool>(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {
         if let Some(entry) = self.lookup_quick(zscore_a, zscore_b) {
             entry
         } else {
-            self.lookup_thorough(zscore_a, zscore_b)
+            self.lookup_thorough::<D>(zscore_a, zscore_b)
         }
     }
     /// Snap the zscores to a `0.5`-unit-size grid and see
@@ -84,7 +84,7 @@ impl<'a> ZGridSubtable<'a> {
     }
     /// Find the gridpoint that minimizes the sum of squared
     /// differences to the given zscores.
-    fn lookup_thorough(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {
+    fn lookup_thorough<const D: bool>(&self, zscore_a: f64, zscore_b: f64) -> &ZGridDBEntry {
         let mut best_entry: Option<(f64, &ZGridDBEntry)> = None;
         let (Ok(start_index) | Err(start_index)) = self
             .0
@@ -95,14 +95,24 @@ impl<'a> ZGridSubtable<'a> {
             delta_a * delta_a
         };
         let next_search_down =
-            |idx: usize| idx.checked_sub(1).map(|i| (i, to_sqr_delta_a(self.0[i].0)));
+            |idx: usize| {
+                if D{
+                eprintln!("[OLD TABLE] decrementing a-pointer down to [a={:?}]", idx.checked_sub(1).map(|i| self.0[i].0));
+            }
+                idx.checked_sub(1).map(|i| (i, to_sqr_delta_a(self.0[i].0)))};
         let next_search_up = |idx: usize| {
+            if D{
+                eprintln!("[OLD TABLE] incrementing a-pointer up to [a={:?}]", self.0.get(idx).map(|t| t.0));
+            }
             Some(idx).and_then(|i| {
                 self.0
                     .get(i)
                     .map(|(gridpoint, _)| (i, to_sqr_delta_a(*gridpoint)))
             })
         };
+        if D{
+            eprintln!("[OLD TABLE] beginning search: [a={:?}] [zscs={:?}]", self.0.get(start_index).map(|t| t.0), [zscore_a, zscore_b]);
+        }
         let mut down_search = next_search_down(start_index);
         let mut up_search = next_search_up(start_index);
         debug_assert!(self.0.len() > 0);
@@ -127,8 +137,12 @@ impl<'a> ZGridSubtable<'a> {
                 }
                 (None, None) => unreachable!(),
             };
+            
             if let Some((best_sqr_delta, entry)) = best_entry {
                 if best_sqr_delta <= sqr_delta_a {
+                    if D {
+                        eprintln!("[OLD TABLE] search done")
+                    }
                     return entry;
                 }
             }
@@ -136,7 +150,13 @@ impl<'a> ZGridSubtable<'a> {
             debug_assert!(!subarr.is_empty());
             let (Ok(j) | Err(j)) =
                 subarr.binary_search_by(|entry| entry.gridpoint().total_cmp(&zscore_b));
+            if D{
+            eprintln!("[OLD TABLE] beginning row search: [a={}]", self.0[i].0);
+        }
             let mut check_j = |j: usize| {
+                if D {
+                    eprintln!("[OLD TABLE] row search checking over [a={}, b={:?}]", self.0[i].0, subarr.get(j).map(|t| t.gridpoint()))
+                }
                 if let Some(entry) = subarr.get(j) {
                     let delta_b = entry.gridpoint() - zscore_b;
                     let sqr_delta_b = delta_b * delta_b;
@@ -148,6 +168,9 @@ impl<'a> ZGridSubtable<'a> {
                         new_best = true;
                     }
                     if new_best {
+                        if D {
+                            eprintln!("[OLD TABLE] hit new best [a={}, b={}]", self.0[i].0, subarr[j].gridpoint())
+                        }
                         best_entry = Some((sqr_delta, &subarr[j]))
                     }
                 }

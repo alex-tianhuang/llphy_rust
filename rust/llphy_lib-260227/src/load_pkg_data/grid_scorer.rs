@@ -4,8 +4,7 @@ use crate::{
     featurizer::{
         GridScorer,
         grid_scorer::{
-            AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry,
-            ZGridSubtable, xmer_sizes,
+            self, AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable, xmer_sizes
         },
     },
     load_pkg_data::read_archive_file,
@@ -211,19 +210,22 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
             let row_len = row_len as usize;
             let dbl_z_offsets = f64x2::from_array([min_a, min_b]) * f64x2::splat(2.0);
             let data = arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::new_zeroed());
-            for (key_a, entryl3) in entryl2 {
-                let key_a = (key_a.0 - min_a) * 2.0;
-                debug_assert_eq!(key_a, key_a.round());
-                let idx_a = key_a as usize;
+            for (key_a, entryl3) in entryl2.iter() {
+                let fl_a = (key_a.0 - min_a) * 2.0;
+                debug_assert_eq!(fl_a, fl_a.round());
+                let idx_a = fl_a as usize;
                 let row = &mut data[idx_a * row_len..(idx_a + 1) * row_len];
-                for (key_b, [weight_total, weight_a, weight_b]) in entryl3 {
-                    let key_b = (key_b.0 - min_b) * 2.0;
-                    debug_assert_eq!(key_b, key_b.round());
-                    let idx_b = key_b as usize;
+                for (key_b, &[weight_total, weight_a, weight_b]) in entryl3.iter() {
+                    let fl_b = (key_b.0 - min_b) * 2.0;
+                    debug_assert_eq!(fl_b, fl_b.round());
+                    let idx_b = fl_b as usize;
                     row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b)
                 }
             }
-            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data);
+            let ___DEBUG_TABLE = grid_scorer::z_grid_db::ZGridSubtable::new(&*arena.alloc_slice_fill_iter(entryl2.into_iter().map(|t| {
+                (t.0.0, arena.alloc_slice_fill_iter(t.1.into_iter().map(|(t, [a, b, c])| grid_scorer::z_grid_db::ZGridDBEntry::from_parts(t.0, a, b, c))) as &[_])
+            })));
+            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data, ___DEBUG_TABLE);
         }
     }
     Ok(z_grid_db)

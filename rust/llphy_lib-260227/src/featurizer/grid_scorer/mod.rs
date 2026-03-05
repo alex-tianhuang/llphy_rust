@@ -14,7 +14,7 @@ use crate::{
 mod avg_sdev_db;
 mod pair_freq_db;
 mod xmer;
-mod z_grid_db;
+pub(crate) mod z_grid_db;
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
@@ -83,7 +83,7 @@ impl GridScorer<'_> {
                 inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
                 let zscores = avg_sdevs[xmer].freqs_to_zscores(freqs);
-                outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
+                outer_accumulator += self.z_grid[aa][xmer].lookup::<false>(zscores);
             }
             if let Some(g) = feature_a_scores.as_mut() {
                 g[aa].push(outer_accumulator.freq_a());
