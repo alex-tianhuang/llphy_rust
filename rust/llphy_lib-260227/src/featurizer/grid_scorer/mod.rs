@@ -4,8 +4,8 @@ use bumpalo::{Bump, collections::Vec};
 pub use pair_freq_db::PairFreqDB;
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-pub use z_grid_db::{ZGridDB, ZGridDBEntry, ZGridSubtable};
-
+pub use z_grid_dense::{ZGridDB, ZGridDBEntry, ZGridSubtable};
+mod z_grid_dense;
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
     featurizer::grid_scorer::pair_freq_db::PairFreqDBEntry,
@@ -82,8 +82,8 @@ impl GridScorer<'_> {
                 let c_term_position = relative_midpoint + xmer.get();
                 inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
-                let [zscore_a, zscore_b] = avg_sdevs[xmer].freqs_to_zscores(freqs);
-                outer_accumulator += self.z_grid[aa][xmer].lookup(zscore_a, zscore_b);
+                let zscores = avg_sdevs[xmer].freqs_to_zscores(freqs);
+                outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
             }
             if let Some(g) = feature_a_scores.as_mut() {
                 g[aa].push(outer_accumulator.freq_a());

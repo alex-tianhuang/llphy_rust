@@ -92,7 +92,7 @@ impl AvgSdevDBEntry {
     /// let zscore_b = (freqs.as_array()[1] - self.avg_b()) / self.std_b();
     /// [zscore_a, zscore_b]
     /// ```
-    pub fn freqs_to_zscores(&self, freqs: f64x2) -> [f64; 2] {
-        ((freqs - self.0.extract::<0, 2>()) * self.0.extract::<2, 2>()).to_array()
+    pub fn freqs_to_zscores(&self, freqs: f64x2) -> f64x2 {
+        (freqs - self.0.extract::<0, 2>()) * self.0.extract::<2, 2>()
     }
 }

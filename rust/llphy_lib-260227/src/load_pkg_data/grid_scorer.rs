@@ -15,6 +15,7 @@ use bumpalo::Bump;
 use serde::Deserialize;
 use serde_pickle::DeOptions;
 use std::{collections::BTreeMap, path::Path};
+use std::simd::f64x2;
 
 /// A list of tag tuples that are associated to each pair.
 ///
@@ -198,16 +199,31 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
         }
         for (xmer, entryl2) in entryl1 {
             let xmer = XmerSize::new(xmer).unwrap();
-            target[xmer] = ZGridSubtable::new(&*arena.alloc_slice_fill_iter(
-                entryl2.into_iter().map(|(k, entryl3)| {
-                    (
-                        k.0,
-                        &*arena.alloc_slice_fill_iter(entryl3.into_iter().map(
-                            |(k, [weight_total, weight_a, weight_b])| ZGridDBEntry::from_parts(k.0, weight_total, weight_a, weight_b),
-                        )),
-                    )
-                }),
-            ))
+            let min_a = entryl2.first_key_value().unwrap().0.0;
+            let max_a = entryl2.last_key_value().unwrap().0.0;
+            let column_len = (max_a - min_a) * 2.0 + 1.0;
+            debug_assert_eq!(column_len, column_len.round());
+            let column_len = column_len as usize;
+            let min_b = entryl2.iter().map(|t| t.1.first_key_value().unwrap().0.0).min_by(f64::total_cmp).unwrap();
+            let max_b = entryl2.iter().map(|t| t.1.last_key_value().unwrap().0.0).max_by(f64::total_cmp).unwrap();
+            let row_len = (max_b - min_b) * 2.0 + 1.0;
+            debug_assert_eq!(row_len, row_len.round());
+            let row_len = row_len as usize;
+            let dbl_z_offsets = f64x2::from_array([min_a, min_b]) * f64x2::splat(2.0);
+            let data = arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::new_zeroed());
+            for (key_a, entryl3) in entryl2 {
+                let key_a = (key_a.0 - min_a) * 2.0;
+                debug_assert_eq!(key_a, key_a.round());
+                let idx_a = key_a as usize;
+                let row = &mut data[idx_a * row_len..(idx_a + 1) * row_len];
+                for (key_b, [weight_total, weight_a, weight_b]) in entryl3 {
+                    let key_b = (key_b.0 - min_b) * 2.0;
+                    debug_assert_eq!(key_b, key_b.round());
+                    let idx_b = key_b as usize;
+                    row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b)
+                }
+            }
+            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data);
         }
     }
     Ok(z_grid_db)
