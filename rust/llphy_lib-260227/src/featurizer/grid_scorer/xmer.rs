@@ -42,10 +42,15 @@ impl XmerSize {
     /// Make a new [`XmerSize`] from a plain number.
     pub fn new(n: usize) -> Option<Self> {
         if (1..=MAX_XMER).contains(&n) {
-            Some(unsafe { XmerSize(NonZero::new_unchecked(n)) })
+            Some(unsafe { Self::new_unchecked(n) })
         } else {
             None
         }
+    }
+    /// Make a new [`XmerSize`] from a plain number
+    /// without checking bounds.
+    pub unsafe fn new_unchecked(n: usize) -> Self {
+        unsafe {Self(NonZero::new_unchecked(n))}
     }
     /// Get a plain number from an [`XmerSize`].
     pub fn get(&self) -> usize {

@@ -64,12 +64,13 @@ impl GridScorer<'_> {
             let mut inner_accumulator = PairFreqDBEntry::new_zeroed();
             let relative_midpoint = subseq.len() / 2;
             let num_windows = cmp::min(relative_midpoint, MAX_XMER);
-            let pair_freqs = &self.pair_freqs[aa];
-            for (xmer, subtable) in xmer_sizes().take(num_windows).zip(pair_freqs) {
+            for i in 0..num_windows {
+                let xmer_int = i + 1;
+                let xmer = unsafe { XmerSize::new_unchecked(xmer_int) };
                 let n_term_position = relative_midpoint - xmer.get();
-                inner_accumulator += &subtable.n_terminal_mapping[subseq[n_term_position]];
+                inner_accumulator += &self.pair_freqs[aa][i].n_terminal_mapping[subseq[n_term_position]];
                 let c_term_position = relative_midpoint + xmer.get();
-                inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
+                inner_accumulator += &self.pair_freqs[aa][i].c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
                 let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
                 outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
