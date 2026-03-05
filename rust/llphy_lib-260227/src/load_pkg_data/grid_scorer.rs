@@ -2,21 +2,19 @@
 use crate::{
     datatypes::{AAMap, Aminoacid},
     featurizer::{
-        GridScorer, grid_scorer::{
+        GridScorer,
+        grid_scorer::{
             AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry,
             ZGridSubtable, xmer_sizes,
         },
     },
-    load_pkg_data::read_archive_file
+    load_pkg_data::read_archive_file,
 };
 use anyhow::{Context, Error};
 use bumpalo::Bump;
 use serde::Deserialize;
 use serde_pickle::DeOptions;
-use std::{
-    collections::BTreeMap,
-    path::Path,
-};
+use std::{collections::BTreeMap, path::Path};
 
 /// A list of tag tuples that are associated to each pair.
 ///
@@ -59,18 +57,19 @@ pub fn load_grid_scorer<'a>(
     pair_name: &str,
     z_grid_db_arena: &'a Bump,
 ) -> Result<GridScorer<'a>, Error> {
-    let filepath = Path::new("PCON2.FREQS.wBOOTDEV");
+    let subdir = Path::new(pair_name);
+    let filepath = subdir.join("PCON2.FREQS.wBOOTDEV");
     let pair_freqs = load_pair_freq_db(&filepath, pair_name)
         .with_context(|| format!("failed to load frequency pair DB @ {}", filepath.display()))?;
-    let xmer_dir = Path::new("STEP4_AVGnSDEVS");
+    let xmer_dir = subdir.join("STEP4_AVGnSDEVS");
     let avg_sdevs = load_avg_sdev_db(&xmer_dir)?;
-    let filepath = Path::new("STEP6_PICKLES").join("SC_GRIDS.pickle4");
+    let filepath = subdir.join("STEP6_PICKLES").join("SC_GRIDS.pickle4");
     let z_grid = load_z_grid_db(&filepath, z_grid_db_arena)
         .with_context(|| format!("failed to load Z grid DB @ {}", filepath.display()))?;
     Ok(GridScorer {
         pair_freqs,
         avg_sdevs,
-        z_grid
+        z_grid,
     })
 }
 /// Load a [`PairFreqDB`] from the given filepath,
@@ -107,8 +106,9 @@ fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Err
         let separation = unsafe { str::from_utf8_unchecked(middle) };
         let aa_x = Aminoacid::try_from(aa_x).map_err(map_err_on_line!(line))?;
         let aa_y = Aminoacid::try_from(aa_y).map_err(map_err_on_line!(line))?;
-        let separation = separation.parse::<usize>().map_err(map_err_on_line!(line))?;
-        let subtable = &mut pair_freq_db[aa_x][separation];
+        let separation = separation
+            .parse::<usize>()
+            .map_err(map_err_on_line!(line))?;
         while let Some(ptype) = parts.next() {
             let is_x = ptype.starts_with("X_");
             if !(is_x || ptype.starts_with("Y_")) {
@@ -133,12 +133,12 @@ fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Err
             debug_assert!(total.is_finite());
             let (target, tag) = if is_x {
                 (
-                    &mut subtable.c_terminal_mapping[aa_y],
+                    &mut pair_freq_db[aa_x][separation].c_terminal_mapping[aa_y],
                     ptype.strip_prefix("X_").unwrap(),
                 )
             } else {
                 (
-                    &mut subtable.n_terminal_mapping[aa_y],
+                    &mut pair_freq_db[aa_y][separation].n_terminal_mapping[aa_x],
                     ptype.strip_prefix("Y_").unwrap(),
                 )
             };
@@ -246,7 +246,7 @@ fn load_avg_sdev_db<'a>(xmer_dir: &Path) -> Result<AvgSdevDB, Error> {
 }
 /// Load the data for one `PCON2.xmer{}` file
 /// into the given `target` [`AvgSdevDB`].
-/// 
+///
 /// Helper function for [`load_avg_sdev_db`].
 fn load_one_xmer_avg_sdev_into_target(
     filepath: &Path,
@@ -281,7 +281,9 @@ fn load_one_xmer_avg_sdev_into_target(
                 .map_err(map_err_on_line!(line))?;
             *target[1] = parts
                 .next()
-                .ok_or_else(|| fail_on_line_with_msg!("expected an standard deviation (float)", line))?
+                .ok_or_else(|| {
+                    fail_on_line_with_msg!("expected an standard deviation (float)", line)
+                })?
                 .parse::<f64>()
                 .map_err(map_err_on_line!(line))?;
         }

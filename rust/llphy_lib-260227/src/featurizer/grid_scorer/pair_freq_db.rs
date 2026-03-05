@@ -76,7 +76,7 @@ impl PairFreqDB {
             [subtable.c_terminal_mapping.values(), subtable.n_terminal_mapping.values()]
                 .into_iter()
                 .flatten()
-                .any(|e| e.is_nan_free())
+                .any(|e| !e.is_nan_free())
         })
     }
 }

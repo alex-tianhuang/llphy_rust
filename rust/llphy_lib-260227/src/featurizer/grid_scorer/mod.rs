@@ -1,17 +1,14 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
-use std::cmp;
-
 pub use avg_sdev_db::AvgSdevDB;
 use bumpalo::{Bump, collections::Vec};
 pub use pair_freq_db::PairFreqDB;
+use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-pub use z_grid_db::{ZGridDB, ZGridSubtable, ZGridDBEntry};
+pub use z_grid_db::{ZGridDB, ZGridDBEntry, ZGridSubtable};
 
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
-    featurizer::grid_scorer::{
-        avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry,
-    },
+    featurizer::grid_scorer::{avg_sdev_db::AvgSdevDBEntry, pair_freq_db::PairFreqDBEntry},
     leak_vec,
 };
 mod avg_sdev_db;
@@ -21,8 +18,6 @@ mod z_grid_db;
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
-/// 
-/// This is a huge stack struct.
 pub struct GridScorer<'a> {
     pub pair_freqs: PairFreqDB,
     pub avg_sdevs: AvgSdevDB,
@@ -79,6 +74,7 @@ impl GridScorer<'_> {
             let mut outer_total = 0;
             let mut outer_weight_a = 0;
             let mut outer_weight_b = 0;
+
             for (xmer, (freq_a, freq_b)) in xmer_sizes().zip(all_xmer_scores) {
                 let AvgSdevDBEntry {
                     avg_a,
@@ -103,7 +99,7 @@ impl GridScorer<'_> {
                 } else {
                     outer_weight_a as f64 / outer_total as f64
                 };
-                g[aa].push(outer_freq_a)
+                g[aa].push(outer_freq_a);
             }
             if let Some(g) = feature_b_scores.as_mut() {
                 let outer_freq_b = if outer_total == 0 {
