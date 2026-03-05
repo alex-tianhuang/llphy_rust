@@ -34,16 +34,16 @@ pub struct ZGridSubtable<'a> {
 /// for some `(aa, xmer, zscore_a, zscore_b)` tuples.
 #[derive(Clone, Copy)]
 pub struct ZGridDBEntry {
-    weight_total: i64,
     weight_a: i64,
     weight_b: i64,
+    weight_total: i64,
 }
 /// An accumulator for computing the weighted average
 /// of a bunch of [`ZGridDBEntry`]s.
 pub struct ZGridEntrySum {
-    weight_total: i64,
     weight_a: i64,
     weight_b: i64,
+    weight_total: i64,
 }
 impl<'a> Deref for ZGridDB<'a> {
     type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;
@@ -170,8 +170,8 @@ impl ZGridEntrySum {
 }
 impl AddAssign<&ZGridDBEntry> for ZGridEntrySum {
     fn add_assign(&mut self, rhs: &ZGridDBEntry) {
-        self.weight_total += rhs.weight_total;
         self.weight_a += rhs.weight_a;
         self.weight_b += rhs.weight_b;
+        self.weight_total += rhs.weight_total;
     }
 }
