@@ -251,7 +251,7 @@ impl ZGridDBEntry {
     pub fn is_occupied(&self) -> bool {
         self.0.as_array()[0] != 0
     }
-    /// Get a new [`ZGridDBEntry`] with all `0.0_f64`.
+    /// Get a new [`ZGridDBEntry`] with all zeroes.
     pub fn new_zeroed() -> Self {
         Self(i64x4::from_array([0; 4]))
     }
