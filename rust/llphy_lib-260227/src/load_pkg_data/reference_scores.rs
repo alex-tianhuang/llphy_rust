@@ -32,8 +32,7 @@ fn load_reference_scores_from_filepath<'a>(filepath: &Path, arena: &'a Bump) -> 
         let headers = reader.headers()?;
         num_features = headers.len().checked_sub(1).ok_or_else(|| Error::msg("expected a `feature_sum` column"))?;
         num_ref_seqs = bytes.iter().filter(|b| **b == b'\n').count() - 1;
-        let mut headers = headers.into_iter();
-        let _tag_column: &str = headers.next().unwrap();
+        let headers = headers.into_iter();
         feature_names = Vec::with_capacity_in(num_features, arena);
         feature_names.extend(headers.take(num_features).map(|s| &*arena.alloc_str(s)));
         debug_assert_eq!(feature_names.len(), num_features);
