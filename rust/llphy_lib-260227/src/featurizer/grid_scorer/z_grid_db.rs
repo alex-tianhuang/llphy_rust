@@ -1,12 +1,45 @@
-//! Module defining [`lookup_thorough`], used
-//! for [super::ZGridSubtable::lookup] in both
-//! simd and non-simd code.
+//! Module defining common implementation details
+//! for [`ZGridDB`], a struct used to query
+//! for values in a grid of z-scores.
+//! 
+//! Separated from simd/non-simd specific implementations.
+
+use std::ops::{Deref, DerefMut};
+
+use crate::{datatypes::AAMap, featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable}};
+
+/// A struct of tables indexable by `(aa, xmer)` keys,
+/// where each subtable is 2D `zscore`-indexable.
+/// See [`ZGridSubtable`].
+///
+/// The subtable is expected to be indexed by `zscore_a`
+/// and then `zscore_b`, NOT `zscore_b` then `zscore_a`.
+pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
+impl<'a> Deref for ZGridDB<'a> {
+    type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<'a> DerefMut for ZGridDB<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl<'a> ZGridDB<'a> {
+    /// Wrap the inner field with a `ZGridDB`.
+    pub fn new(inner: AAMap<XmerIndexableArray<ZGridSubtable<'a>>>) -> Self {
+        Self(inner)
+    }
+}
 
 /// Find the gridpoint that minimizes the
 /// sum of squared differences to the given zscores.
 /// 
-/// Usage
-/// -----
+/// Helper function for [`ZGridSubtable::lookup`].
+/// 
+/// Arguments
+/// ---------
 /// - `data` is a `row_len x column_len` grid of entries of type `T`,
 ///   which may or may not be occupied with data 
 /// - `to_occupied` attempts to convert `T` into an occupied entry

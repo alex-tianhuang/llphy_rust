@@ -12,17 +12,18 @@ mod xmer;
 mod z_grid_db;
 mod pair_freq_db;
 pub use pair_freq_db::PairFreqDB;
+pub use z_grid_db::ZGridDB;
 #[cfg(feature = "simd")]
 mod simd;
 #[cfg(feature = "simd")]
 pub use simd::{
-    PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry, PairFreqDBEntry
+    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry, PairFreqDBEntry
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
+    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)

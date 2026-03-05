@@ -1,17 +1,9 @@
-//! Module defining [`ZGridDB`].
-use crate::datatypes::AAMap;
-use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
+//! Module defining substructures of [`crate::featurizer::grid_scorer::ZGridDB`]
+//! using `#[portable_simd]`.
 use crate::featurizer::grid_scorer::z_grid_db::lookup_thorough;
-use std::ops::{AddAssign, Deref, DerefMut};
+use std::ops::{AddAssign};
 use std::simd::{f64x2, i64x4, StdFloat, cmp::SimdPartialOrd, num::{SimdFloat, SimdInt}};
 
-/// A struct of tables indexable by `(aa, xmer)` keys,
-/// where each subtable is 2D `zscore`-indexable.
-/// See [`ZGridSubtable`] and [`ZGridDBEntry`].
-///
-/// The subtable is expected to be indexed by `zscore_a`
-/// and then `zscore_b`, NOT `zscore_b` then `zscore_a`.
-pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 /// A `(zscore_a, zscore_b)`-indexable collection of weights
 /// for features `a` and `b`.
 ///
@@ -52,23 +44,6 @@ pub struct ZGridDBEntry(i64x4);
 /// The `i64` at index 3 is chosen to be ignored because
 /// it does not map to numeric data in [`ZGridDBEntry`].
 pub struct ZGridEntrySum(i64x4);
-impl<'a> Deref for ZGridDB<'a> {
-    type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<'a> DerefMut for ZGridDB<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl<'a> ZGridDB<'a> {
-    /// Wrap the inner field with a `ZGridDB`.
-    pub fn new(inner: AAMap<XmerIndexableArray<ZGridSubtable<'a>>>) -> Self {
-        Self(inner)
-    }
-}
 impl<'a> ZGridSubtable<'a> {
     /// Make a new [`ZGridSubtable`] with no content.
     pub const fn placeholder() -> Self {
