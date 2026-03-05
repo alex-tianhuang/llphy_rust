@@ -1,7 +1,7 @@
-//! Module defining [`PairFreqDB`].
+//! Module defining [`PairFreqDB`] and [`PairFreqEntrySum`]
+//! without the use of the `#[portable_simd]` feature.
 use crate::datatypes::{AAMap, MAX_XMER};
 use std::ops::{AddAssign, Deref, DerefMut};
-use std::simd::{f64x4, f64x2};
 
 /// The number of `gap_length`-indexable tables in a [`PairFreqDB`].
 ///
@@ -33,17 +33,25 @@ pub struct PairFreqSubtable {
 }
 /// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
 /// 
-/// The field names are not visible in the SIMD representation,
-/// but it is essentially an array consisting of named floats
-/// `[weight_a, weight_b, total_a, total_b]`.
-/// 
 /// Dev note
 /// --------
 /// The reason this contains data for two features instead
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`super::ZGridDB`] and so it is a
 /// win for cache locality to get them loaded in one struct.
-pub struct PairFreqDBEntry(f64x4);
+pub struct PairFreqDBEntry {
+    weight_a: f64,
+    weight_b: f64,
+    total_a: f64,
+    total_b: f64
+}
+/// An accumulator struct for taking the sum of many [`PairFreqDBEntry`]s.
+pub struct PairFreqEntrySum {
+    weight_a: f64,
+    weight_b: f64,
+    total_a: f64,
+    total_b: f64
+}
 impl Deref for PairFreqDB {
     type Target = AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>;
     fn deref(&self) -> &Self::Target {
@@ -81,44 +89,62 @@ impl PairFreqDB {
 }
 
 impl PairFreqDBEntry {
+    /// Shorthand for iterating over fields.
+    fn iter(&self) -> impl Iterator<Item = &f64> {
+        // SAFETY: this struct is `#[repr(C)]` so I know exactly what it looks like.
+        unsafe{ &*(self as *const Self as *const [f64; 4]) }.iter()
+    }
     /// Get a new [`PairFreqDBEntry`] that is filled with `f64::NAN`.
     const fn new_nan_filled() -> Self {
-        Self(f64x4::from_array([f64::NAN; 4]))
+        Self {
+            weight_a: f64::NAN,
+            weight_b: f64::NAN,
+            total_a: f64::NAN,
+            total_b: f64::NAN,
+        }
     }
     /// False if there are `f64::NAN`s in any field.
     pub fn is_nan_free(&self) -> bool {
-        self.0.as_array()
-            .into_iter()
+        self.iter()
             .all(|x| !x.is_nan())
-    }
-    /// Get a new [`PairFreqDBEntry`] that is filled with `0.0_f64`.
-    pub fn new_zeroed() -> Self {
-        Self(f64x4::from_array([0.0; 4]))
     }
     /// Set weights and total for feature `A`.
     pub fn set_a(&mut self, weight: f64, total: f64) {
-        let this = self.0.as_mut_array();
-        this[0] = weight;
-        this[2] = total;
+        self.weight_a = weight;
+        self.total_a = total;
     }
     /// Set weights and total for feature `B`.
     pub fn set_b(&mut self, weight: f64, total: f64) {
-        let this = self.0.as_mut_array();
-        this[1] = weight;
-        this[3] = total;
+        self.weight_b = weight;
+        self.total_b = total;
     }
-    /// Helper method for [`super::GridScorer::score_sequence`].
+    
+}
+impl PairFreqEntrySum {
+    /// Get a new [`PairFreqEntrySum`] that is filled with `0.0_f64`.
+    pub fn new_zeroed() -> Self {
+        Self {
+            weight_a: 0.0,
+            weight_b: 0.0,
+            total_a: 0.0,
+            total_b: 0.0,
+        }
+    }
+    /// Helper method for [`crate::featurizer::GridScorer::score_sequence`].
     /// 
     /// Equivalent to:
     /// ```
-    /// f64x2::from_array([self.weight_a / self.total_a, self.weight_b / self.total_b])
+    /// [self.weight_a / self.total_a, self.weight_b / self.total_b]
     /// ```
-    pub fn as_frequencies(&self) -> f64x2 {
-        self.0.extract::<0, 2>() / self.0.extract::<2, 2>()
+    pub fn as_frequencies(&self) -> [f64; 2] {
+        [self.weight_a / self.total_a, self.weight_b / self.total_b]
     }
 }
-impl AddAssign<&Self> for PairFreqDBEntry {
-    fn add_assign(&mut self, rhs: &Self) {
-        self.0 += &rhs.0
+impl AddAssign<&PairFreqDBEntry> for PairFreqEntrySum {
+    fn add_assign(&mut self, rhs: &PairFreqDBEntry) {
+        self.weight_a += rhs.weight_a;
+        self.weight_b += rhs.weight_b;
+        self.total_a += rhs.total_a;
+        self.total_b += rhs.total_b;
     }
 }

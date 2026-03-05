@@ -1,19 +1,21 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
-pub use avg_sdev_db::AvgSdevDB;
 use bumpalo::{Bump, collections::Vec};
-pub use pair_freq_db::PairFreqDB;
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-pub use z_grid_db::{ZGridDB, ZGridDBEntry, ZGridSubtable};
-mod z_grid_db;
 use crate::{
-    datatypes::{AAMap, MAX_XMER, aa_canonical_str},
-    featurizer::grid_scorer::pair_freq_db::PairFreqDBEntry,
-    leak_vec,
+    datatypes::{AAMap, MAX_XMER, aa_canonical_str}, featurizer::grid_scorer::no_simd::{PairFreqEntrySum, ZGridEntrySum}, leak_vec
 };
-mod avg_sdev_db;
-mod pair_freq_db;
+
 mod xmer;
+mod z_grid_db;
+#[cfg(feature = "simd")]
+mod simd;
+#[cfg(feature = "simd")]
+pub use simd::{PairFreqDB, AvgSdevDB, ZGridDB, ZGridDBEntry, ZGridSubtable};
+#[cfg(not(feature = "simd"))]
+mod no_simd;
+#[cfg(not(feature = "simd"))]
+pub use no_simd::{PairFreqDB, AvgSdevDB, ZGridDB, ZGridDBEntry, ZGridSubtable};
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
@@ -60,8 +62,8 @@ impl GridScorer<'_> {
             let subseq = get_subseq_centered_at(sequence, i);
             debug_assert!(subseq.len() >= 3);
             debug_assert!(subseq.len() % 2 == 1);
-            let mut outer_accumulator = ZGridDBEntry::new_zeroed();
-            let mut inner_accumulator = PairFreqDBEntry::new_zeroed();
+            let mut outer_accumulator = ZGridEntrySum::new_zeroed();
+            let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
             let relative_midpoint = subseq.len() / 2;
             let num_windows = cmp::min(relative_midpoint, MAX_XMER);
             for i in 0..num_windows {
@@ -75,7 +77,7 @@ impl GridScorer<'_> {
                 let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
                 outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
             }
-            let [freq_a, freq_b] = outer_accumulator.as_frequencies().to_array();
+            let [freq_a, freq_b] = outer_accumulator.as_frequencies();
             feature_a_scores[aa].push(freq_a);
             feature_b_scores[aa].push(freq_b);
         }
