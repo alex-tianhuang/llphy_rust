@@ -11,10 +11,6 @@ pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 /// in `1..=MAX_XMER`. For [`XmerIndexableArray`].
 #[derive(Clone, Copy)]
 pub struct XmerSize(NonZero<usize>);
-/// Like `1..=MAX_XMER` but returns [`XmerSize`]s.
-pub fn xmer_sizes() -> impl ExactSizeIterator<Item = XmerSize> {
-    (0..MAX_XMER).map(|n| unsafe { XmerSize(NonZero::new_unchecked(n + 1)) })
-}
 impl<T> XmerIndexableArray<T> {
     pub const fn new(arr: [T; MAX_XMER]) -> Self {
         Self(arr)
