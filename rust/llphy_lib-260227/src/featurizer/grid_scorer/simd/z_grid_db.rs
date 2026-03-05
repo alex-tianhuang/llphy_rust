@@ -3,7 +3,7 @@ use crate::datatypes::AAMap;
 use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
 use crate::featurizer::grid_scorer::z_grid_db::lookup_thorough;
 use std::ops::{AddAssign, Deref, DerefMut};
-use std::simd::{f64x2, i64x4, i64x2, StdFloat, cmp::SimdPartialOrd, num::{SimdFloat, SimdInt}};
+use std::simd::{f64x2, i64x4, StdFloat, cmp::SimdPartialOrd, num::{SimdFloat, SimdInt}};
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -35,23 +35,21 @@ pub struct ZGridSubtable<'a> {
 /// for some `(aa, xmer, zscore_a, zscore_b)` tuples.
 ///
 /// The field names are not visible in the SIMD representation,
-/// but 3/4 of the struct is an array consisting of named integers
-/// [`weight_total`] (which has a method) and then `weight_a` and `weight_b`.
+/// but the first 3/4 of the struct is an array consisting of
+/// named integers `[weight_a, weight_b, weight_total]`.
 ///
-/// The remaining integer array slot is for [`Self::is_occupied`],
-/// which is a boolean that checks if this field contains
-/// valid weight data.
-///
-/// [`weight_total`]: Self::weight_total
+/// The remaining integer array slot (at index 3) is for
+/// [`Self::is_occupied`], which is a boolean that checks
+/// if this field contains valid weight data.
 #[derive(Clone, Copy)]
 pub struct ZGridDBEntry(i64x4);
 /// An accumulator for computing the weighted average
 /// of a bunch of [`ZGridDBEntry`]s.
 /// 
 /// Like [`ZGridDBEntry`], it is basically just three named
-/// integers `[weight_total, weight_a, weight_b]`.
+/// integers `[weight_a, weight_b, weight_total]`.
 /// 
-/// The `i64` at index 0 is chosen to be ignored because
+/// The `i64` at index 3 is chosen to be ignored because
 /// it does not map to numeric data in [`ZGridDBEntry`].
 pub struct ZGridEntrySum(i64x4);
 impl<'a> Deref for ZGridDB<'a> {
@@ -129,7 +127,7 @@ impl<'a> ZGridSubtable<'a> {
 impl ZGridDBEntry {
     /// Get a new, occupied [`ZGridDBEntry`] from its three fields.
     pub fn new_occupied(weight_total: i64, weight_a: i64, weight_b: i64) -> Self {
-        Self(i64x4::from_array([1, weight_total, weight_a, weight_b]))
+        Self(i64x4::from_array([weight_a, weight_b, weight_total, 1]))
     }
     /// Make a new unoccupied [`ZGridDBEntry`].
     pub const fn unoccupied() -> Self {
@@ -142,7 +140,7 @@ impl ZGridDBEntry {
     /// True if this memory location is occupied
     /// with valid/initialized weight data.
     fn is_occupied(&self) -> bool {
-        self.0.as_array()[0] != 0
+        self.0[3] != 0
     }
 }
 
@@ -157,7 +155,7 @@ macro_rules! impl_getters {
         }
     };
 }
-impl_getters!([1, weight_total]);
+impl_getters!([2, weight_total]);
 impl ZGridEntrySum {
     /// Get a new [`ZGridEntrySum`] with all zeroes.
     pub fn new_zeroed() -> Self {
@@ -172,7 +170,7 @@ impl ZGridEntrySum {
         if self.weight_total() == 0 {
             [0.0; 2]
         } else {
-            (self.0.extract::<2, 2>().cast::<f64>() / i64x2::splat(self.weight_total()).cast::<f64>()).to_array()
+            (self.0.extract::<0, 2>().cast::<f64>() / f64x2::splat(self.weight_total() as f64)).to_array()
         }
     }
 }
