@@ -82,7 +82,7 @@ impl<'a> ZGridSubtable<'a> {
     ///
     /// It is assumed that the two floats represent the zscore
     /// for feature `A` and `B` respectively.
-    pub fn lookup<const D: bool>(&self, zscores: f64x2) -> &ZGridDBEntry {
+    pub fn lookup(&self, zscores: f64x2) -> &ZGridDBEntry {
         let dbl_zscores = zscores * f64x2::splat(2.0);
         if let Some(entry) = self.lookup_quick(dbl_zscores) {
             entry

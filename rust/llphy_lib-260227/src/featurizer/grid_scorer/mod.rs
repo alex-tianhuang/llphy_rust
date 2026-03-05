@@ -72,7 +72,7 @@ impl GridScorer<'_> {
                 inner_accumulator += &subtable.c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
                 let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
-                outer_accumulator += self.z_grid[aa][xmer].lookup::<false>(zscores);
+                outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
             }
             let [freq_a, freq_b] = outer_accumulator.as_frequencies().to_array();
             feature_a_scores[aa].push(freq_a);
