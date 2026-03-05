@@ -76,8 +76,7 @@ impl GridScorer<'_> {
             let relative_midpoint = subseq.len() / 2;
             let num_windows = cmp::min(relative_midpoint, MAX_XMER);
             for j in 0..num_windows {
-                let xmer_int = j + 1;
-                let xmer = unsafe { XmerSize::new_unchecked(xmer_int) };
+                let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
                 let n_term_position = relative_midpoint - xmer.get();
                 inner_accumulator +=
                     &self.pair_freqs[aa][j].n_terminal_mapping[subseq[n_term_position]];
