@@ -1,5 +1,5 @@
 mod sequences;
-pub(crate) use sequences::{AAMap, AMINOACIDS, Aminoacid, FastaEntry, aa_canonical_str};
+pub(crate) use sequences::{AAMap, AMINOACIDS, Aminoacid, FastaEntry, aa_canonical_str, AAIndex};
 mod llphy;
 pub(crate) use llphy::{
     FeatureMatrix, MAX_XMER, ModelTrainingBase, PostProcessedFeatureMatrix, ReferenceFeatureMatrix,
