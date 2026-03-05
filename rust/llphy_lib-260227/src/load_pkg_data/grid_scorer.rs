@@ -14,7 +14,6 @@ use anyhow::{Context, Error};
 use bumpalo::Bump;
 use serde::Deserialize;
 use serde_pickle::DeOptions;
-use std::simd::f64x2;
 use std::{collections::BTreeMap, path::Path};
 
 /// A list of tag tuples that are associated to each pair.
@@ -217,9 +216,9 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
             let row_len = (max_b - min_b) * 2.0 + 1.0;
             debug_assert_eq!(row_len, row_len.round());
             let row_len = row_len as usize;
-            let dbl_z_offsets = f64x2::from_array([min_a, min_b]) * f64x2::splat(2.0);
+            let dbl_z_offsets = [min_a * 2.0, min_b * 2.0];
             let data =
-                arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::new_zeroed());
+                arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::unoccupied());
             for (key_a, entryl3) in entryl2.iter() {
                 let dbl_z_a = (key_a.0 - min_a) * 2.0;
                 debug_assert_eq!(dbl_z_a, dbl_z_a.round());
@@ -229,7 +228,7 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
                     let dbl_z_b = (key_b.0 - min_b) * 2.0;
                     debug_assert_eq!(dbl_z_b, dbl_z_b.round());
                     let idx_b = dbl_z_b as usize;
-                    row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b)
+                    row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b);
                 }
             }
             target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data);
