@@ -1,4 +1,4 @@
-#![feature(portable_simd)]
+#![cfg_attr(feature = "simd", feature(portable_simd))]
 //! A library for computing phase separation propensity
 //! and related biophysical features of sequences.
 //!
