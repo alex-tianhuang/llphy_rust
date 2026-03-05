@@ -30,10 +30,10 @@ mod thresholds;
 ///
 /// IO
 /// --
-/// If `PBAR` is true, this function
+/// If `QUIET` is false, this function
 /// prints the grid that is currently being worked on along with a
 /// progress bar to whatever the default terminal for [`indicatif`] is.
-pub fn featurize<'a, const PBAR: bool>(
+pub fn featurize<'a, const QUIET: bool>(
     sequences: &[FastaEntry<'_>],
     feature_names: &'a [&'a str],
     grid_decoders: &[(&str, [GridDecoder; 2])],
@@ -73,7 +73,7 @@ pub fn featurize<'a, const PBAR: bool>(
         // This is me trying my best not to put it on the stack.
         let grid_scorer = per_feature_pair_arena
             .alloc_try_with(|| load_grid_scorer(pair_name, &per_feature_pair_arena))?;
-        if PBAR {
+        if !QUIET {
             let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
             for (j, entry) in sequences.iter().enumerate() {

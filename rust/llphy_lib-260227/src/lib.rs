@@ -51,6 +51,7 @@ pub struct Args {
     input_file: PathBuf,
     /// Output file, a CSV.
     #[arg(short, long)]
+    #[pyo3(default = None)]
     output_file: Option<PathBuf>,
     /// The type of score to output.
     #[arg(short, long, default_value = "percentile", value_enum)]
@@ -61,6 +62,12 @@ pub struct Args {
     #[arg(short, long, default_value = "human+PDB", value_enum)]
     #[pyo3(default = ModelTrainingBase::HumanPDB)]
     model_train_base: ModelTrainingBase,
+    /// When set, suppress the progress bar and warnings
+    /// about sequences that contained invalid characters
+    /// (which may lead to unexpected sequences).
+    #[arg(short, long, action)]
+    #[pyo3(default = false)]
+    quiet: bool,
 }
 #[pymodule(name = "_rust")]
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -93,27 +100,40 @@ fn main_cli(py: Python) -> Result<(), Error> {
 /// IO
 /// --
 /// This function calls [`read_fasta`] and [`featurize`],
-/// which both touch the stderr output. It also prints one message to stderr.
+/// which both touch the stderr output. It also prints a couple
+/// messages to stderr.
 #[pyfunction]
 fn run_fasta_scorer(py: Python, args: Args) -> Result<(), Error> {
+    /// Print or not depending on the local variable `quiet`.
+    macro_rules! eprintln_or_quiet {
+        ($quiet:ident, $($tt:tt)*) => {
+            if !$quiet {
+                std::eprintln!($($tt)*);
+            }
+        };
+    }
     let Args {
         input_file,
         output_file,
         score_type,
         model_train_base,
+        quiet
     } = args;
     // Everything de-allocates when this does,
     // so no need to de-allocate anything else!
     let arena = Bump::new();
-    let sequences = leak_vec(read_fasta(&input_file, &arena).with_context(|| {
+    eprintln_or_quiet!(quiet, "Reading fasta file...");
+    let sequences = leak_vec(maybe_quiet!(quiet, read_fasta(&input_file, &arena)).with_context(|| {
         format!(
             "failed to get sequences from fasta file @ {}",
             input_file.display()
         )
     })?);
+    eprintln_or_quiet!(quiet, "Loading feature grid decoders...");
     let grid_decoders = load_grid_decoders(model_train_base, &arena, py)?;
+    eprintln_or_quiet!(quiet, "Loading reference feature distribution...");
     let post_processor = load_post_processor(score_type, model_train_base, &arena)?;
-    let matrix = featurize::<true>(sequences, DEFAULT_FEATURES, grid_decoders, &arena, py)?;
+    let matrix = maybe_quiet!(quiet, featurize(sequences, DEFAULT_FEATURES, grid_decoders, &arena, py))?;
     let matrix = post_processor.post_process(matrix, &arena)?;
     write_output(output_file, sequences, matrix, &arena)
 }
@@ -127,3 +147,16 @@ fn leak_vec<'a, T>(buf: Vec<'a, T>) -> &'a mut [T] {
     //         are not de-allocated and reused by the arena.
     unsafe { mem::transmute::<&mut [T], &'a mut [T]>(buf.as_mut_slice()) }
 }
+/// Shorthand for setting a function to
+/// quiet or not depending on a non-const value.
+/// 
+/// Equivalent to:
+/// ```
+/// if quiet {foo::<QUIET: true>(...)} else {foo::<QUIET: false>(...)}
+/// ```
+macro_rules! maybe_quiet {
+    ($quiet:ident, $func:ident($($args:tt)*)) => {
+        if $quiet {$func::<true>($($args)*)} else {$func::<false>($($args)*)}
+    };
+}
+use maybe_quiet;

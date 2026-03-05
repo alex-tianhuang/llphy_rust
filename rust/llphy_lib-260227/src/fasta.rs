@@ -16,9 +16,9 @@ use std::path::Path;
 ///
 /// IO
 /// --
-/// May log warnings to stderr,
+/// When `QUIET` is false, may log warnings to stderr,
 /// because it calls [`parse_fasta_entries`] which logs to stderr.
-pub fn read_fasta<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, FastaEntry<'a>>, Error> {
+pub fn read_fasta<'a, const QUIET: bool>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, FastaEntry<'a>>, Error> {
     let bytes = read_file(path, arena)?;
     if bytes.is_empty() {
         return Err(Error::msg("got empty file"));
@@ -26,23 +26,31 @@ pub fn read_fasta<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, FastaEntry
     if !bytes.starts_with(&[b'>']) {
         return Err(Error::msg("got non-`>` character on first line"));
     }
-    Ok(parse_fasta_entries(bytes, arena))
+    Ok(parse_fasta_entries::<QUIET>(bytes, arena))
 }
 /// Parse a buffer with FASTA-formatted sequences
 /// into a vector of [`FastaEntry`] structs.
 ///
 /// IO
 /// --
-/// This function logs to stderr when it encounters:
+/// When `QUIET` is false, this function logs to stderr when it encounters:
 /// - Headers that are non-UTF8
 /// - Sequences that contain non aminoacid (lowercase or uppercase) characters
 /// - Sequences that are empty (after removing all non aminoacid characters)
-fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, FastaEntry<'a>> {
+fn parse_fasta_entries<'a, const QUIET: bool>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, FastaEntry<'a>> {
+    /// Print or not depending on the const parameter `QUIET`.
+    macro_rules! eprintln_or_quiet {
+        ($($tt:tt)*) => {
+            if !QUIET {
+                std::eprintln!($($tt)*);
+            }
+        };
+    }
     let mut slice = leak_vec(bytes);
     let mut entries = Vec::new_in(arena);
     while !slice.is_empty() {
         let Some(idx) = end_of_current_header(slice) else {
-            eprintln!(
+            eprintln_or_quiet!(
                 "could not parse entry (empty sequence): {}",
                 String::from_utf8_lossy(slice.strip_prefix(&[b'>']).unwrap_or(slice))
             );
@@ -71,7 +79,7 @@ fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, Fasta
                 header = h;
             }
             Err(e) => {
-                eprintln!(
+                eprintln_or_quiet!(
                     "could not parse entry ({}): {}",
                     e,
                     String::from_utf8_lossy(header_slice)
@@ -85,7 +93,7 @@ fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, Fasta
                 sequence = s;
             }
             ParseResult::WarnInvalidBytes(s) => {
-                eprintln!(
+                eprintln_or_quiet!(
                     "sequence was modified, non aminoacid bytes removed while parsing this entry: {}\nmodified sequence: {}",
                     header,
                     s.as_str(),
@@ -93,11 +101,11 @@ fn parse_fasta_entries<'a>(bytes: Vec<'a, u8>, arena: &'a Bump) -> Vec<'a, Fasta
                 sequence = s;
             }
             ParseResult::Empty => {
-                eprintln!("could not parse entry (empty sequence): {}", header);
+                eprintln_or_quiet!("could not parse entry (empty sequence): {}", header);
                 continue;
             }
             ParseResult::EmptyAndInvalidBytes => {
-                eprintln!("could not parse entry (contained invalid bytes): {}", header);
+                eprintln_or_quiet!("could not parse entry (contained invalid bytes): {}", header);
                 continue;
             }
         }
