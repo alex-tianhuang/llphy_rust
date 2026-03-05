@@ -53,7 +53,7 @@ pub fn featurize<'a, const PBAR: bool>(
         }
         per_feature_pair_arena.reset();
         let feature_name = feature_names[i];
-        let (pair_name, feature_names) = find_pair_and_features_from_one_feature_name(feature_name)
+        let (pair_name, feature_names_for_pair) = find_pair_and_features_from_one_feature_name(feature_name)
             .ok_or_else(|| {
                 Error::msg(format!("unknown/unsupported feature name {}", feature_name))
             })?;
@@ -63,7 +63,7 @@ pub fn featurize<'a, const PBAR: bool>(
             .ok_or_else(|| {
                 Error::msg(format!("unknown/unsupported feature name {}", feature_name))
             })?;
-        let [feature_idx_a, feature_idx_b] = feature_names.map(|feature_name| {
+        let [feature_idx_a, feature_idx_b] = feature_names_for_pair.map(|feature_name| {
             let location = feature_names.iter().find(|n| **n == feature_name)?;
             let idx = (location as *const &str as usize - feature_names.as_ptr() as usize)
                 / size_of::<&str>();
@@ -133,6 +133,7 @@ pub fn featurize<'a, const PBAR: bool>(
             completed[i] = true;
         }
     }
+    debug_assert!(completed.iter().all(|b|*b));
     for feature_vec in data.chunks_exact_mut(row_size) {
         let [subfeatures @ .., sumfeatures] = feature_vec else {
             unreachable!()
