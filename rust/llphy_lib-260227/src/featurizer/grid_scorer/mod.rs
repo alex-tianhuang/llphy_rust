@@ -6,20 +6,21 @@ use crate::{
 use bumpalo::{Bump, collections::Vec};
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-
+mod avg_sdev_db;
+pub use avg_sdev_db::AvgSdevDB;
 #[cfg(feature = "simd")]
 mod simd;
 mod xmer;
 mod z_grid_db;
 #[cfg(feature = "simd")]
 pub use simd::{
-    AvgSdevDB, PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
+    PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    AvgSdevDB, PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
+    PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)

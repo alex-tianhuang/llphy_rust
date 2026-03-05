@@ -1,12 +1,6 @@
-//! Module defining [`AvgSdevDB`]
+//! Module defining [`AvgSdevDBEntry`]
 //! without the use of the `#[portable_simd]` feature.
-use crate::datatypes::{AAMap, MAX_XMER};
-use crate::featurizer::grid_scorer::xmer::XmerIndexableArray;
-use std::ops::{Deref, DerefMut};
 
-/// A struct containing [`AvgSdevDBEntry`] for each
-/// `(aa, xmer)` key.
-pub struct AvgSdevDB(AAMap<XmerIndexableArray<AvgSdevDBEntry>>);
 /// A struct containing average and inverse standard deviations
 /// of two features for a given `(aa, xmer)` key.
 ///
@@ -22,33 +16,9 @@ pub struct AvgSdevDBEntry {
     invstd_a: f64,
     invstd_b: f64,
 }
-impl Deref for AvgSdevDB {
-    type Target = AAMap<XmerIndexableArray<AvgSdevDBEntry>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for AvgSdevDB {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl AvgSdevDB {
-    /// Get a new [`AvgSdevDB`] struct that is filled with `f64::NAN`.
-    pub fn new_nan_filled() -> Self {
-        AvgSdevDB(AAMap(
-            [const { XmerIndexableArray::new([const { AvgSdevDBEntry::new_nan_filled() }; MAX_XMER]) };
-                20],
-        ))
-    }
-    /// True if there are `f64::NAN`s in any entry.
-    pub fn is_nan_free(&self) -> bool {
-        !self.0.values().flatten().any(|e| !e.is_nan_free())
-    }
-}
 impl AvgSdevDBEntry {
     /// Get a new [`AvgSdevDBEntry`] that is filled with `f64::NAN`.
-    const fn new_nan_filled() -> Self {
+    pub const fn new_nan_filled() -> Self {
         Self {
             avg_a: f64::NAN,
             avg_b: f64::NAN,
