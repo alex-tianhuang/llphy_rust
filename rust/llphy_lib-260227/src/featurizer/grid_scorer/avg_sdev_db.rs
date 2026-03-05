@@ -12,12 +12,7 @@ pub struct AvgSdevDB(AAMap<XmerIndexableArray<AvgSdevDBEntry>>);
 ///
 /// The field names are not visible in the SIMD representation,
 /// but it is essentially an array consisting of named floats
-/// [`avg_a`], [`avg_b`], [`invstd_a`], and [`invstd_b`].
-/// 
-/// [`avg_a`]: Self::avg_a
-/// [`avg_b`]: Self::avg_b
-/// [`invstd_a`]: Self::invstd_a
-/// [`invstd_b`]: Self::invstd_b
+/// `[avg_a, avg_b, invstd_a, invstd_b]`.
 /// 
 /// Dev note
 /// --------
