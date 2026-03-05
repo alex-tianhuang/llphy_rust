@@ -26,6 +26,7 @@ mod datatypes;
 mod fasta;
 mod featurizer;
 mod output;
+mod pbar;
 use pyo3::{
     Bound, FromPyObject, PyResult, Python,
     prelude::pymodule,
