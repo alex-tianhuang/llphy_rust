@@ -96,13 +96,6 @@ impl PostProcessedFeatureMatrix<'_> {
             Self::Processed(FeatureMatrix { data, .. }) => PostProcessedFeatureVector::Processed(&data[i * self.row_len()..][..self.row_len()])
         })
     }
-    /// Get a reasonable limit on the length of bytes needed to display a
-    /// comma separated list of values in one row from this struct.
-    pub fn row_format_size(&self) -> usize {
-        let representative_string = if matches!(self, Self::Raw(_)) {i64::MIN.to_string()} else {2.0_f64.sqrt().to_string()};
-        let slot_format_size = representative_string.len();
-        self.row_len() * (slot_format_size + 1)
-    }
 }
 impl<'a> PostProcessedFeatureVector<'a> {
     /// Utility method for the [`crate::output`] module.

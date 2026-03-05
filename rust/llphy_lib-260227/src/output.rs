@@ -50,9 +50,7 @@ fn write_output_virtualized(
     let feature_names = matrix.feature_names();
     let mut column_buffer = Vec::with_capacity_in(feature_names.len() + 2, arena);
     let feature_sum_column_name = bumpalo::format!(in arena, "{}-feature sum", feature_names.len());
-    let mut values_buffer = String::with_capacity_in(matrix.row_format_size(), arena);
-    #[cfg(debug_assertions)]
-    let init_cap = values_buffer.capacity();
+    let mut values_buffer = String::new_in(arena);
     column_buffer.push("tag");
     column_buffer.extend_from_slice(feature_names);
     // SAFETY: this field's lifetime does not need to
@@ -74,6 +72,5 @@ fn write_output_virtualized(
         writer(&column_buffer)?;
         values_buffer.clear();
     }
-    debug_assert_eq!(init_cap, values_buffer.capacity());
     Ok(())
 }
