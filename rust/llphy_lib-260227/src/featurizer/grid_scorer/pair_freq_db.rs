@@ -35,12 +35,7 @@ pub struct PairFreqSubtable {
 /// 
 /// The field names are not visible in the SIMD representation,
 /// but it is essentially an array consisting of named floats
-/// [`weight_a`], [`weight_b`], [`total_a`], and [`total_b`].
-///
-/// [`weight_a`]: Self::weight_a
-/// [`weight_b`]: Self::weight_b
-/// [`total_a`]: Self::total_a
-/// [`total_b`]: Self::total_b
+/// `[weight_a, weight_b, total_a, total_b]`.
 /// 
 /// Dev note
 /// --------
@@ -85,18 +80,6 @@ impl PairFreqDB {
     }
 }
 
-/// Shorthand for associating each index of the
-/// array of [`PairFreqDBEntry`] with a named field.
-macro_rules! impl_getters {
-    ($([$index:literal, $field:ident]),*) => {
-        impl PairFreqDBEntry {
-            $(pub fn $field(&self) -> f64 {
-                self.0.as_array()[$index]
-            })*
-        }
-    };
-}
-impl_getters!([0, weight_a], [1, weight_b], [2, total_a], [3, total_b]);
 impl PairFreqDBEntry {
     /// Get a new [`PairFreqDBEntry`] that is filled with `f64::NAN`.
     const fn new_nan_filled() -> Self {
@@ -124,7 +107,12 @@ impl PairFreqDBEntry {
         this[1] = weight;
         this[3] = total;
     }
-    /// Equivalent to `f64x2::from_array([self.weight_a() / self.total_a(), self.weight_b() / self.total_b()])`.
+    /// Helper method for [`super::GridScorer::score_sequence`].
+    /// 
+    /// Equivalent to:
+    /// ```
+    /// f64x2::from_array([self.weight_a / self.total_a, self.weight_b / self.total_b])
+    /// ```
     pub fn as_frequencies(&self) -> f64x2 {
         self.0.extract::<0, 2>() / self.0.extract::<2, 2>()
     }

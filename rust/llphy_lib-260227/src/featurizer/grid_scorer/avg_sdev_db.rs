@@ -50,18 +50,6 @@ impl AvgSdevDB {
         !self.0.values().flatten().any(|e| !e.is_nan_free())
     }
 }
-/// Shorthand for associating each index of the
-/// array of [`AvgSdevDBEntry`] with a named field.
-macro_rules! impl_getters {
-    ($([$index:literal, $field:ident]),*) => {
-        impl AvgSdevDBEntry {
-            $(pub fn $field(&self) -> f64 {
-                self.0.as_array()[$index]
-            })*
-        }
-    }; 
-}
-impl_getters!([0, avg_a], [1, avg_b], [2, invstd_a], [3, invstd_b]);
 impl AvgSdevDBEntry {
     /// Get a new [`AvgSdevDBEntry`] that is filled with `f64::NAN`.
     const fn new_nan_filled() -> Self {
@@ -85,11 +73,13 @@ impl AvgSdevDBEntry {
         this[1] = avg;
         this[3] = inv_std;
     }
+    /// Helper method for [`super::GridScorer::score_sequence`].
+    /// 
     /// Equivalent to:
     /// ```
     /// let freqs: f64x2;
-    /// let zscore_a = (freqs.as_array()[0] - self.avg_a()) * self.invstd_a();
-    /// let zscore_b = (freqs.as_array()[1] - self.avg_b()) * self.invstd_b();
+    /// let zscore_a = (freqs.as_array()[0] - self.avg_a) * self.invstd_a;
+    /// let zscore_b = (freqs.as_array()[1] - self.avg_b) * self.invstd_b;
     /// [zscore_a, zscore_b]
     /// ```
     pub fn freqs_to_zscores(&self, freqs: f64x2) -> f64x2 {
