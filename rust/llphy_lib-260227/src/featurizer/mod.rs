@@ -13,12 +13,12 @@
 use crate::{
     datatypes::{FastaEntry, FeatureMatrix, find_pair_and_features_from_one_feature_name},
     load_pkg_data::load_grid_scorer,
+    pbar::pbar,
 };
 use anyhow::Error;
 use bumpalo::Bump;
 pub use grid_decoder::GridDecoder;
-pub use grid_scorer::{GridScore, GridScorer};
-use indicatif::ProgressBar;
+pub use grid_scorer::GridScorer;
 use pyo3::Python;
 pub use thresholds::Thresholds;
 mod grid_decoder;
@@ -53,8 +53,8 @@ pub fn featurize<'a, const PBAR: bool>(
         }
         per_feature_pair_arena.reset();
         let feature_name = feature_names[i];
-        let (pair_name, feature_names_for_pair) = find_pair_and_features_from_one_feature_name(feature_name)
-            .ok_or_else(|| {
+        let (pair_name, feature_names_for_pair) =
+            find_pair_and_features_from_one_feature_name(feature_name).ok_or_else(|| {
                 Error::msg(format!("unknown/unsupported feature name {}", feature_name))
             })?;
         let (_, [grid_decoder_a, grid_decoder_b]) = grid_decoders
@@ -74,7 +74,7 @@ pub fn featurize<'a, const PBAR: bool>(
         let grid_scorer = per_feature_pair_arena
             .alloc_try_with(|| load_grid_scorer(pair_name, &per_feature_pair_arena))?;
         if PBAR {
-            let pbar = ProgressBar::new(sequences.len() as _);
+            let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
             for (j, entry) in sequences.iter().enumerate() {
                 let scored = grid_scorer.score_sequence(
@@ -133,7 +133,7 @@ pub fn featurize<'a, const PBAR: bool>(
             completed[i] = true;
         }
     }
-    debug_assert!(completed.iter().all(|b|*b));
+    debug_assert!(completed.iter().all(|b| *b));
     for feature_vec in data.chunks_exact_mut(row_size) {
         let [subfeatures @ .., sumfeatures] = feature_vec else {
             unreachable!()
