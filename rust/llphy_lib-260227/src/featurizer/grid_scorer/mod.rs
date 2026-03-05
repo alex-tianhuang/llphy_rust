@@ -4,8 +4,8 @@ use bumpalo::{Bump, collections::Vec};
 pub use pair_freq_db::PairFreqDB;
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-pub use z_grid_dense::{ZGridDB, ZGridDBEntry, ZGridSubtable};
-mod z_grid_dense;
+pub use z_grid_db::{ZGridDB, ZGridDBEntry, ZGridSubtable};
+mod z_grid_db;
 use crate::{
     datatypes::{AAMap, MAX_XMER, aa_canonical_str},
     featurizer::grid_scorer::pair_freq_db::PairFreqDBEntry,
@@ -14,7 +14,6 @@ use crate::{
 mod avg_sdev_db;
 mod pair_freq_db;
 mod xmer;
-pub(crate) mod z_grid_db;
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
@@ -89,7 +88,7 @@ impl GridScorer<'_> {
                 g[aa].push(outer_accumulator.freq_a());
             }
             if let Some(g) = feature_b_scores.as_mut() {
-                g[aa].push(outer_accumulator.freq_b())
+                g[aa].push(outer_accumulator.freq_b());
             }
         }
         GridScore {

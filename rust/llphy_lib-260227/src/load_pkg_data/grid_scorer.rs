@@ -4,7 +4,8 @@ use crate::{
     featurizer::{
         GridScorer,
         grid_scorer::{
-            self, AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable, xmer_sizes
+            AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry,
+            ZGridSubtable, xmer_sizes,
         },
     },
     load_pkg_data::read_archive_file,
@@ -13,8 +14,8 @@ use anyhow::{Context, Error};
 use bumpalo::Bump;
 use serde::Deserialize;
 use serde_pickle::DeOptions;
-use std::{collections::BTreeMap, path::Path};
 use std::simd::f64x2;
+use std::{collections::BTreeMap, path::Path};
 
 /// A list of tag tuples that are associated to each pair.
 ///
@@ -203,29 +204,35 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
             let column_len = (max_a - min_a) * 2.0 + 1.0;
             debug_assert_eq!(column_len, column_len.round());
             let column_len = column_len as usize;
-            let min_b = entryl2.iter().map(|t| t.1.first_key_value().unwrap().0.0).min_by(f64::total_cmp).unwrap();
-            let max_b = entryl2.iter().map(|t| t.1.last_key_value().unwrap().0.0).max_by(f64::total_cmp).unwrap();
+            let min_b = entryl2
+                .iter()
+                .map(|t| t.1.first_key_value().unwrap().0.0)
+                .min_by(f64::total_cmp)
+                .unwrap();
+            let max_b = entryl2
+                .iter()
+                .map(|t| t.1.last_key_value().unwrap().0.0)
+                .max_by(f64::total_cmp)
+                .unwrap();
             let row_len = (max_b - min_b) * 2.0 + 1.0;
             debug_assert_eq!(row_len, row_len.round());
             let row_len = row_len as usize;
             let dbl_z_offsets = f64x2::from_array([min_a, min_b]) * f64x2::splat(2.0);
-            let data = arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::new_zeroed());
+            let data =
+                arena.alloc_slice_fill_copy(row_len * column_len, ZGridDBEntry::new_zeroed());
             for (key_a, entryl3) in entryl2.iter() {
-                let fl_a = (key_a.0 - min_a) * 2.0;
-                debug_assert_eq!(fl_a, fl_a.round());
-                let idx_a = fl_a as usize;
+                let dbl_z_a = (key_a.0 - min_a) * 2.0;
+                debug_assert_eq!(dbl_z_a, dbl_z_a.round());
+                let idx_a = dbl_z_a as usize;
                 let row = &mut data[idx_a * row_len..(idx_a + 1) * row_len];
                 for (key_b, &[weight_total, weight_a, weight_b]) in entryl3.iter() {
-                    let fl_b = (key_b.0 - min_b) * 2.0;
-                    debug_assert_eq!(fl_b, fl_b.round());
-                    let idx_b = fl_b as usize;
+                    let dbl_z_b = (key_b.0 - min_b) * 2.0;
+                    debug_assert_eq!(dbl_z_b, dbl_z_b.round());
+                    let idx_b = dbl_z_b as usize;
                     row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b)
                 }
             }
-            let ___DEBUG_TABLE = grid_scorer::z_grid_db::ZGridSubtable::new(&*arena.alloc_slice_fill_iter(entryl2.into_iter().map(|t| {
-                (t.0.0, arena.alloc_slice_fill_iter(t.1.into_iter().map(|(t, [a, b, c])| grid_scorer::z_grid_db::ZGridDBEntry::from_parts(t.0, a, b, c))) as &[_])
-            })));
-            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data, ___DEBUG_TABLE);
+            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data);
         }
     }
     Ok(z_grid_db)
