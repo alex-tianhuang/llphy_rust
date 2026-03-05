@@ -48,6 +48,7 @@ pub fn featurize<'a, const QUIET: bool>(
     const UNINIT_SENTINEL: i64 = i64::MIN;
     let data = arena.alloc_slice_fill_copy(num_sequences * row_size, UNINIT_SENTINEL);
     let completed = arena.alloc_slice_fill_copy(feature_names.len(), false);
+    let mut sequence_buffer = Vec::new_in(arena);
     let mut per_feature_pair_arena = Bump::new();
     for i in 0..num_features {
         if completed[i] {
@@ -75,7 +76,6 @@ pub fn featurize<'a, const QUIET: bool>(
         // This is me trying my best not to put it on the stack.
         let grid_scorer = per_feature_pair_arena
             .alloc_try_with(|| load_grid_scorer(pair_name, &per_feature_pair_arena))?;
-        let mut sequence_buffer = Vec::new_in(arena);
         if !QUIET {
             let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
