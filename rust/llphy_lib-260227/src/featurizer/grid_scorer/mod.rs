@@ -8,19 +8,21 @@ use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
 mod avg_sdev_db;
 pub use avg_sdev_db::AvgSdevDB;
-#[cfg(feature = "simd")]
-mod simd;
 mod xmer;
 mod z_grid_db;
+mod pair_freq_db;
+pub use pair_freq_db::PairFreqDB;
+#[cfg(feature = "simd")]
+mod simd;
 #[cfg(feature = "simd")]
 pub use simd::{
-    PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry
+    PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry, PairFreqDBEntry
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry
+    PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
