@@ -7,10 +7,9 @@ use std::simd::{f64x4, f64x2};
 /// A struct containing [`AvgSdevDBEntry`] for each
 /// `(aa, xmer)` key.
 pub struct AvgSdevDB(AAMap<XmerIndexableArray<AvgSdevDBEntry>>);
-/// A struct containing average and standard deviations
+/// A struct containing average and inverse standard deviations
 /// of two features for a given `(aa, xmer)` key.
 ///
-/// 
 /// The field names are not visible in the SIMD representation,
 /// but it is essentially an array consisting of named floats
 /// [`avg_a`], [`avg_b`], [`invstd_a`], and [`invstd_b`].
