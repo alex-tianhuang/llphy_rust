@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Read the file at `path` into a memory arena, and parse it into
 /// a vector of [`FastaEntry`] structs.
