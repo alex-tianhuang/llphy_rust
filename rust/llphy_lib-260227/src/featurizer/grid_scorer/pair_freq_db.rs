@@ -69,7 +69,6 @@ impl PairFreqDB {
             }; 20],
         ))
     }
-    #[cfg(debug_assertions)]
     /// False if there are `f64::NAN`s in any entry.
     pub fn is_nan_free(&self) -> bool {
         !self.0.values().flatten().any(|subtable| {
@@ -90,7 +89,6 @@ impl PairFreqDBEntry {
             total_b: f64::NAN,
         }
     }
-    #[cfg(debug_assertions)]
     /// False if there are `f64::NAN`s in any field.
     pub fn is_nan_free(&self) -> bool {
         [self.weight_a, self.weight_b, self.total_a, self.total_b]

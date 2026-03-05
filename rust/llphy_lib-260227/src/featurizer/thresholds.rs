@@ -36,7 +36,6 @@ impl Thresholds {
             }; 20],
         ))
     }
-    #[cfg(debug_assertions)]
     /// True if there are `f64::NAN`s in any slot of the thresholds.
     pub fn is_nan_free(&self) -> bool {
         !self.0.0.iter().any(|t| t.upper.is_nan() || t.lower.is_nan())

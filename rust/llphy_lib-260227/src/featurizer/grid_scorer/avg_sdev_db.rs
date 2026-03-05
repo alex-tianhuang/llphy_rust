@@ -40,7 +40,6 @@ impl AvgSdevDB {
                 20],
         ))
     }
-    #[cfg(debug_assertions)]
     /// True if there are `f64::NAN`s in any entry.
     pub fn is_nan_free(&self) -> bool {
         !self.0.values().flatten().any(|e| !e.is_nan_free())
@@ -56,7 +55,6 @@ impl AvgSdevDBEntry {
             std_b: f64::NAN,
         }
     }
-    #[cfg(debug_assertions)]
     /// False if there are `f64::NAN`s in any field.
     pub fn is_nan_free(&self) -> bool {
         [self.avg_a, self.std_a, self.avg_b, self.std_b]
