@@ -120,12 +120,22 @@ impl<'a> ZGridSubtable<'a> {
 }
 impl ZGridDBEntry {
     /// Get a new, occupied [`ZGridDBEntry`] from its three fields.
-    pub fn new_occupied(weight_total: i64, weight_a: i64, weight_b: i64) -> Self {
-        Self {
+    /// 
+    /// This returns an option so that the [`crate::load_pkg_data::load_grid_scorer`]
+    /// function looks a little nicer between simd and no-simd.
+    pub fn new_occupied(weight_total: i64, weight_a: i64, weight_b: i64) -> Option<Self> {
+        Some(Self {
             weight_total,
             weight_a,
             weight_b,
-        }
+        })
+    }
+    /// Make a new unoccupied [`ZGridDBEntry`].
+    /// 
+    /// This returns an option so that the [`crate::load_pkg_data::load_grid_scorer`]
+    /// function looks a little nicer between simd and no-simd.
+    pub const fn unoccupied() -> Option<Self> {
+        None
     }
 }
 impl ZGridEntrySum {
