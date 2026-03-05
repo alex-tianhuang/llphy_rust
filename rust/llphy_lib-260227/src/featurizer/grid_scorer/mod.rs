@@ -1,21 +1,26 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
+use crate::{
+    datatypes::{AAMap, MAX_XMER, aa_canonical_str},
+    leak_vec,
+};
 use bumpalo::{Bump, collections::Vec};
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
-use crate::{
-    datatypes::{AAMap, MAX_XMER, aa_canonical_str}, featurizer::grid_scorer::no_simd::{PairFreqEntrySum, ZGridEntrySum}, leak_vec
-};
 
+#[cfg(feature = "simd")]
+mod simd;
 mod xmer;
 mod z_grid_db;
 #[cfg(feature = "simd")]
-mod simd;
-#[cfg(feature = "simd")]
-pub use simd::{PairFreqDB, AvgSdevDB, ZGridDB, ZGridDBEntry, ZGridSubtable};
+pub use simd::{
+    AvgSdevDB, PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
+};
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
-pub use no_simd::{PairFreqDB, AvgSdevDB, ZGridDB, ZGridDBEntry, ZGridSubtable};
+pub use no_simd::{
+    AvgSdevDB, PairFreqDB, PairFreqEntrySum, ZGridDB, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
+};
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
@@ -70,9 +75,11 @@ impl GridScorer<'_> {
                 let xmer_int = i + 1;
                 let xmer = unsafe { XmerSize::new_unchecked(xmer_int) };
                 let n_term_position = relative_midpoint - xmer.get();
-                inner_accumulator += &self.pair_freqs[aa][i].n_terminal_mapping[subseq[n_term_position]];
+                inner_accumulator +=
+                    &self.pair_freqs[aa][i].n_terminal_mapping[subseq[n_term_position]];
                 let c_term_position = relative_midpoint + xmer.get();
-                inner_accumulator += &self.pair_freqs[aa][i].c_terminal_mapping[subseq[c_term_position]];
+                inner_accumulator +=
+                    &self.pair_freqs[aa][i].c_terminal_mapping[subseq[c_term_position]];
                 let freqs = inner_accumulator.as_frequencies();
                 let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
                 outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
