@@ -141,14 +141,12 @@ fn run_fasta_scorer(py: Python, args: Args) -> Result<(), Error> {
 /// into new, nicer package data (e.g. model weights, zgrids, etc.)
 #[pyfunction]
 pub fn cleanup_pkg_data(py: Python) -> Result<(), Error> {
-    #[cfg(debug_assertions)]
-    return Err(Error::msg("ABORTING: this function causes a segfault on debug builds because it asks for huge stack sizes."));
     let mut arena = Bump::new();
     let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("pkg_data");
     let mut bytes = std::vec::Vec::new();
     for (pair_name, _) in PAIR_NAMES_AND_FEATURE_NAMES {
         arena.reset();
-        let grid_scorer = arena.alloc(load_grid_scorer(pair_name, &arena)?);
+        let grid_scorer = load_grid_scorer(pair_name, &arena)?;
         let subdir = data_dir.join("feature_pairs").join(pair_name);
         let filepath = subdir.join(format!("gridscorer.bin"));
         bytes.clear();
@@ -158,7 +156,7 @@ pub fn cleanup_pkg_data(py: Python) -> Result<(), Error> {
         } else {
             grid_scorer.serialize(&mut bytes)?;
         }
-        let round_trip = arena.alloc(GridScorer::deserialize(&mut &*bytes, &arena)?);
+        let round_trip = GridScorer::deserialize(&mut &*bytes, &arena)?;
         assert!(round_trip == grid_scorer);
         if !filepath.exists() {
             std::fs::create_dir_all(&subdir)?;

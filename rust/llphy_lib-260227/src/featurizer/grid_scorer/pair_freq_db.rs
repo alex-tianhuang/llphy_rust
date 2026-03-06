@@ -3,6 +3,7 @@
 //! collection of [`PairFreqDBEntry`]s.
 //!
 //! (see [`PairFreqDB`] for what `xy_orientation` means).
+use anyhow::Error;
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::{
     mem::MaybeUninit,
@@ -31,13 +32,13 @@ const PAIR_FREQ_DB_LEN: usize = MAX_XMER + 1;
 ///   of `aa_x`. In practice I just do both so it doesn't matter.
 /// - `gap_length` can be any number in `0..=MAX_XMER`.
 ///   The inner array is one longer than an `xmer`-indexable array.
-#[derive(BorshDeserialize, BorshSerialize, PartialEq)]
+#[derive(BorshSerialize, PartialEq)]
 #[repr(transparent)]
 pub struct PairFreqDB(AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>);
 /// A substructure of [`PairFreqDB`] that organizes entries based
 /// on the `xy_orientation` (whether residue `y` is N-terminal or
 /// C-terminal of `x`).
-#[derive(BorshDeserialize, BorshSerialize, PartialEq)]
+#[derive(BorshSerialize, PartialEq)]
 pub struct PairFreqSubtable {
     // If `aa_y` is N-terminal to `aa_x`
     // index into this field with `aa_y`.
@@ -105,5 +106,22 @@ impl PairFreqDB {
             .flatten()
             .any(|e| !e.is_nan_free())
         })
+    }
+    /// Moral equivalent of implementing deserialization on [`PairFreqDB`],
+    /// but does it by reference so that don't have to put it on the stack.
+    pub fn deserialize_into(this: &mut MaybeUninit<Self>, buf: &mut &[u8]) -> Result<(), Error> {
+        let this = Self::init_with_nans(this);
+        for arr in this.0.values_mut() {
+            for subtable in arr {
+                for mapping in [&mut subtable.n_terminal_mapping, &mut subtable.c_terminal_mapping] {
+                    for slot in mapping.values_mut() {
+                        let data = PairFreqDBEntry::deserialize(buf)?;
+                        *slot = data;
+                    }
+                }
+            }
+        }
+        debug_assert!(this.is_nan_free());
+        Ok(())
     }
 }

@@ -65,15 +65,21 @@ pub fn load_grid_scorer<'a>(pair_name: &str, arena: &'a Bump) -> Result<&'a Grid
     let target = grid_scorer.as_mut_ptr();
     let subdir = Path::new(pair_name);
     let filepath = subdir.join("PCON2.FREQS.wBOOTDEV");
+    // SAFETY: target is a valid memory addr for a `GridScorer`,
+    //         therefore so is the calculated pointer to `pair_freqs`.
     let pair_freqs =
         unsafe { &mut *addr_of_mut!((*target).pair_freqs).cast::<MaybeUninit<PairFreqDB>>() };
     load_pair_freq_db_into(pair_freqs, &filepath, pair_name)
         .with_context(|| format!("failed to load frequency pair DB @ {}", filepath.display()))?;
     let xmer_dir = subdir.join("STEP4_AVGnSDEVS");
+    // SAFETY: target is a valid memory addr for a `GridScorer`,
+    //         therefore so is the calculated pointer to `avg_sdevs`.
     let avg_sdevs =
         unsafe { &mut *addr_of_mut!((*target).avg_sdevs).cast::<MaybeUninit<AvgSdevDB>>() };
     load_avg_sdev_db_into(avg_sdevs, &xmer_dir)?;
     let filepath = subdir.join("STEP6_PICKLES").join("SC_GRIDS.pickle4");
+    // SAFETY: target is a valid memory addr for a `GridScorer`,
+    //         therefore so is the calculated pointer to `z_grid`.
     let z_grid = unsafe { &mut *addr_of_mut!((*target).z_grid).cast::<MaybeUninit<ZGridDB>>() };
     load_z_grid_db_into(z_grid, &filepath, arena)
         .with_context(|| format!("failed to load Z grid DB @ {}", filepath.display()))?;

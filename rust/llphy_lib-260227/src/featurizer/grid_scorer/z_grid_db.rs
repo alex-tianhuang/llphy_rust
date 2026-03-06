@@ -52,18 +52,15 @@ impl<'a> ZGridDB<'a> {
         }
     }
     /// Moral equivalent of implementing deserialization on [`ZGridDB`],
-    /// but with a memory arena to put dynamically allocated subtables into.
-    pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<Self, Error> {
-        let mut arr = [const { None }; 20];
-        for slot in arr.iter_mut() {
-            let mut arr = [const { None }; _];
-            for slot in arr.iter_mut() {
-                let subtable = ZGridSubtable::deserialize(buf, arena)?;
-                *slot = Some(subtable)
+    /// but does it by reference so that don't have to put it on the stack.
+    pub fn deserialize_into(this: &mut MaybeUninit<Self>, buf: &mut &[u8], arena: &'a Bump) -> Result<(), Error> {
+        let this = Self::as_uninit_inner(this);
+        for arr in this.values_mut() {
+            for slot in arr {
+                slot.write(ZGridSubtable::deserialize(buf, arena)?);
             }
-            *slot = Some(XmerIndexableArray::new(arr.map(Option::unwrap)))
         }
-        Ok(ZGridDB(AAMap(arr.map(Option::unwrap))))
+        Ok(())
     }
 }
 
