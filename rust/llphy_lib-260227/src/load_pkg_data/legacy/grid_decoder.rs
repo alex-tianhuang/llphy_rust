@@ -2,7 +2,7 @@
 use crate::{
     datatypes::{Aminoacid, ModelTrainingBase},
     featurizer::{GridDecoder, Thresholds},
-    load_pkg_data::read_archive_file,
+    load_pkg_data::legacy::read_archive_file,
 };
 use anyhow::Error;
 use bumpalo::Bump;

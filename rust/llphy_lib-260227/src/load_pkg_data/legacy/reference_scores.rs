@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Error};
 use bumpalo::{Bump, collections::Vec};
 
-use crate::{datatypes::{ModelTrainingBase, ReferenceFeatureMatrix}, leak_vec, load_pkg_data::read_archive_file};
+use crate::{datatypes::{ModelTrainingBase, ReferenceFeatureMatrix}, leak_vec, load_pkg_data::legacy::read_archive_file};
 
 /// Load `human` sequence reference scores computed from
 /// the model trained on the given `model_train_base`.

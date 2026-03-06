@@ -8,7 +8,7 @@ use crate::{
             ZGridSubtable, xmer_sizes,
         },
     },
-    load_pkg_data::read_archive_file,
+    load_pkg_data::legacy::read_archive_file,
 };
 use anyhow::{Context, Error};
 use bumpalo::Bump;

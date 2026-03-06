@@ -4,7 +4,7 @@ use bumpalo::Bump;
 
 use crate::{
     datatypes::{ModelTrainingBase, ScoreType},
-    load_pkg_data::load_reference_scores,
+    load_pkg_data::legacy::load_reference_scores,
     post_processor::PostProcessor,
 };
 
