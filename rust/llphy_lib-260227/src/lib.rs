@@ -148,7 +148,7 @@ pub fn cleanup_pkg_data(py: Python) -> Result<(), Error> {
     let mut bytes = std::vec::Vec::new();
     for (pair_name, _) in PAIR_NAMES_AND_FEATURE_NAMES {
         arena.reset();
-        let grid_scorer = Box::new(load_grid_scorer(pair_name, &arena)?);
+        let grid_scorer = arena.alloc(load_grid_scorer(pair_name, &arena)?);
         let subdir = data_dir.join("feature_pairs").join(pair_name);
         let filepath = subdir.join(format!("gridscorer.bin"));
         bytes.clear();
@@ -158,7 +158,7 @@ pub fn cleanup_pkg_data(py: Python) -> Result<(), Error> {
         } else {
             grid_scorer.serialize(&mut bytes)?;
         }
-        let round_trip = Box::new(GridScorer::deserialize(&mut &*bytes, &arena)?);
+        let round_trip = arena.alloc(GridScorer::deserialize(&mut &*bytes, &arena)?);
         assert!(round_trip == grid_scorer);
         if !filepath.exists() {
             std::fs::create_dir_all(&subdir)?;
