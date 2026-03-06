@@ -75,7 +75,7 @@ fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_fasta_scorer, m)?)?;
     Ok(())
 }
-/// Entry point for the `cli` that computes biophysical features.
+/// Entry point for the CLI that computes biophysical features.
 /// 
 /// Wrapper around the library function [`run_fasta_scorer`].
 #[pyfunction]
