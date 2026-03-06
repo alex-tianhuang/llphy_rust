@@ -4,8 +4,7 @@ use crate::{
     featurizer::{
         GridScorer,
         grid_scorer::{
-            AvgSdevDB, PairFreqDB, XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry,
-            ZGridSubtable, xmer_sizes,
+            AvgSdevDB, PairFreqDB, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable, xmer_sizes,
         },
     },
     load_pkg_data::legacy::read_archive_file,
@@ -14,7 +13,7 @@ use anyhow::{Context, Error};
 use bumpalo::Bump;
 use serde::Deserialize;
 use serde_pickle::DeOptions;
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, mem::MaybeUninit, path::Path, ptr::addr_of_mut};
 
 /// A list of tag tuples that are associated to each pair.
 ///
@@ -53,33 +52,46 @@ macro_rules! map_err_on_line {
 
 /// Load a [`GridScorer`] from
 /// Cai's (@haocai1992) old data files.
-pub fn load_grid_scorer<'a>(
-    pair_name: &str,
-    z_grid_db_arena: &'a Bump,
-) -> Result<GridScorer<'a>, Error> {
+/// 
+/// Allocates into the given memory arena because
+/// `GridScorer`s are 1MB structs and I keep getting
+/// segfaults which I suspect are stack overflows.
+pub fn load_grid_scorer<'a>(pair_name: &str, arena: &'a Bump) -> Result<&'a GridScorer<'a>, Error> {
+    // Since `GridScorer` always borrows from the arena and is
+    // therefore able to have no drop glue, if at any point the
+    // initialization of this grid scorer fails it can be forgotten
+    // because the memory arena will deallocate all the relevant space.
+    let grid_scorer = arena.alloc_with(<MaybeUninit<GridScorer>>::uninit);
+    let target = grid_scorer.as_mut_ptr();
     let subdir = Path::new(pair_name);
     let filepath = subdir.join("PCON2.FREQS.wBOOTDEV");
-    let pair_freqs = load_pair_freq_db(&filepath, pair_name)
+    let pair_freqs =
+        unsafe { &mut *addr_of_mut!((*target).pair_freqs).cast::<MaybeUninit<PairFreqDB>>() };
+    load_pair_freq_db_into(pair_freqs, &filepath, pair_name)
         .with_context(|| format!("failed to load frequency pair DB @ {}", filepath.display()))?;
     let xmer_dir = subdir.join("STEP4_AVGnSDEVS");
-    let avg_sdevs = load_avg_sdev_db(&xmer_dir)?;
+    let avg_sdevs =
+        unsafe { &mut *addr_of_mut!((*target).avg_sdevs).cast::<MaybeUninit<AvgSdevDB>>() };
+    load_avg_sdev_db_into(avg_sdevs, &xmer_dir)?;
     let filepath = subdir.join("STEP6_PICKLES").join("SC_GRIDS.pickle4");
-    let z_grid = load_z_grid_db(&filepath, z_grid_db_arena)
+    let z_grid = unsafe { &mut *addr_of_mut!((*target).z_grid).cast::<MaybeUninit<ZGridDB>>() };
+    load_z_grid_db_into(z_grid, &filepath, arena)
         .with_context(|| format!("failed to load Z grid DB @ {}", filepath.display()))?;
-    Ok(GridScorer {
-        pair_freqs,
-        avg_sdevs,
-        z_grid,
-    })
+    // SAFETY: just initialized all fields above
+    Ok(unsafe { grid_scorer.assume_init_ref() })
 }
-/// Load a [`PairFreqDB`] from the given filepath,
-/// expecting entries of tags associated to `pair_name`.
+/// Given space for a [`PairFreqDB`],
+/// write data from the given file into it.
 ///
 /// It is expected that the filepath contains plaintext
 /// column data.
 ///
 /// See also [`PAIR_NAMES_AND_PAIR_FREQ_TAGS`].
-fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Error> {
+fn load_pair_freq_db_into(
+    this: &mut MaybeUninit<PairFreqDB>,
+    filepath: &Path,
+    pair_name: &str,
+) -> Result<(), Error> {
     let Some((_, tags)) = PAIR_NAMES_AND_PAIR_FREQ_TAGS
         .iter()
         .find(|(known_name, _)| *known_name == pair_name)
@@ -88,7 +100,7 @@ fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Err
     };
     let bytes = read_archive_file(filepath)?;
     let s = String::from_utf8(bytes)?;
-    let mut pair_freq_db = PairFreqDB::new_nan_filled();
+    let pair_freq_db = PairFreqDB::init_with_nans(this);
     for line in s.lines() {
         let mut parts = line.split_ascii_whitespace();
         let pair_key = parts
@@ -154,15 +166,22 @@ fn load_pair_freq_db(filepath: &Path, pair_name: &str) -> Result<PairFreqDB, Err
         }
     }
     debug_assert!(pair_freq_db.is_nan_free());
-    Ok(pair_freq_db)
+    Ok(())
 }
-/// Load a [`ZGridDB`] from the given filepath
-/// into memory managed by the given arena.
+/// Given space for a [`ZGridDB`],
+/// write data from the given file into it.
+///
+/// Will use the given memory arena
+/// to allocate dynamic amounts of memory.
 ///
 /// It is expected that the given filepath contains
 /// a pickle file that can be unpickled using
 /// builtin python types.
-fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, Error> {
+fn load_z_grid_db_into<'a>(
+    this: &mut MaybeUninit<ZGridDB<'a>>,
+    filepath: &Path,
+    arena: &'a Bump,
+) -> Result<(), Error> {
     let bytes = read_archive_file(filepath)?;
     let bytes = &*bytes;
     /// Helper struct for getting sorted floats out of this pickle file.
@@ -177,9 +196,7 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
     let mut unpickled_value = serde_pickle::from_slice::<
         AAMap<Option<BTreeMap<usize, BTreeMap<SortableFloat, BTreeMap<SortableFloat, [i64; 3]>>>>>,
     >(bytes, DeOptions::default())?;
-    let mut z_grid_db: ZGridDB = ZGridDB::new(AAMap(
-        [const { XmerIndexableArray::new([const { ZGridSubtable::placeholder() }; _]) }; 20],
-    ));
+    let z_grid_db = ZGridDB::as_uninit_inner(this);
     for ((aa, target), slot) in z_grid_db.iter_mut().zip(unpickled_value.values_mut()) {
         let entryl1 = slot.take().ok_or_else(|| {
             Error::msg(format!(
@@ -231,40 +248,42 @@ fn load_z_grid_db<'a>(filepath: &Path, arena: &'a Bump) -> Result<ZGridDB<'a>, E
                     row[idx_b] = ZGridDBEntry::new_occupied(weight_total, weight_a, weight_b);
                 }
             }
-            target[xmer] = ZGridSubtable::new(dbl_z_offsets, row_len, data);
+            target[xmer].write(ZGridSubtable::new(dbl_z_offsets, row_len, data));
         }
     }
-    Ok(z_grid_db)
+    Ok(())
 }
-/// Load a [`AvgSdevDB`] from the given subdirectory.
+/// Given space for an [`AvgSdevDB`], initialize it
+/// using data from the given `xmer_dir`.
 ///
 /// It is expected that the subdirectory contains files
 /// of the form `PCON.xmer{N}` for all integers `N` in
 /// `1..=MAX_XMER`.
-fn load_avg_sdev_db<'a>(xmer_dir: &Path) -> Result<AvgSdevDB, Error> {
-    let mut avg_sdev_db = AvgSdevDB::new_nan_filled();
+fn load_avg_sdev_db_into<'a>(
+    this: &mut MaybeUninit<AvgSdevDB>,
+    xmer_dir: &Path,
+) -> Result<(), Error> {
+    let avg_sdev_db = AvgSdevDB::init_with_nans(this);
     for xmer in xmer_sizes() {
         let filepath = xmer_dir.join(format!("PCON2.xmer{}", xmer.get()));
-        load_one_xmer_avg_sdev_into_target(&filepath, xmer, &mut avg_sdev_db).with_context(
-            || {
-                format!(
-                    "failed to load xmer avg/stdev statistics @ {}",
-                    filepath.display()
-                )
-            },
-        )?;
+        load_one_xmer_avg_sdev_into(avg_sdev_db, &filepath, xmer).with_context(|| {
+            format!(
+                "failed to load xmer avg/stdev statistics @ {}",
+                filepath.display()
+            )
+        })?;
     }
     debug_assert!(avg_sdev_db.is_nan_free());
-    Ok(avg_sdev_db)
+    Ok(())
 }
-/// Load the data for one `PCON2.xmer{}` file
-/// into the given `target` [`AvgSdevDB`].
+/// Load the data for one `PCON2.xmer{}`
+/// file into the correct slot.
 ///
-/// Helper function for [`load_avg_sdev_db`].
-fn load_one_xmer_avg_sdev_into_target(
+/// Helper function for [`load_avg_sdev_db_into`].
+fn load_one_xmer_avg_sdev_into(
+    this: &mut AvgSdevDB,
     filepath: &Path,
     xmer: XmerSize,
-    target: &mut AvgSdevDB,
 ) -> Result<(), Error> {
     let bytes = read_archive_file(&filepath)?;
     let s = String::from_utf8(bytes)?;
@@ -279,7 +298,7 @@ fn load_one_xmer_avg_sdev_into_target(
         let rest = unsafe { str::from_utf8_unchecked(rest) };
 
         let mut parts = rest.trim_ascii_start().split_ascii_whitespace();
-        let entry = &mut target[aa][xmer];
+        let entry = &mut this[aa][xmer];
         /// Shorthand for parsing fields associated with feature `A` and then feature `B`.
         macro_rules! parse_ab_fields {
             ($entry:ident, $parts:ident, $($method:ident),*) => {{

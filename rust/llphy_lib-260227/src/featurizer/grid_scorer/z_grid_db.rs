@@ -7,7 +7,7 @@
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::Bump;
-use std::ops::{Deref, DerefMut};
+use std::{mem::MaybeUninit, ops::{Deref, DerefMut}};
 
 use crate::{
     datatypes::AAMap,
@@ -21,6 +21,7 @@ use crate::{
 /// The subtable is expected to be indexed by `zscore_a`
 /// and then `zscore_b`, NOT `zscore_b` then `zscore_a`.
 #[derive(PartialEq)]
+#[repr(transparent)]
 pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 /// The maximum number of Z-score cells in `ZGridSubtable`s
 /// derived from Cai's old `LLPhyScore` executable.
@@ -42,9 +43,13 @@ impl<'a> DerefMut for ZGridDB<'a> {
     }
 }
 impl<'a> ZGridDB<'a> {
-    /// Wrap the inner field with a `ZGridDB`.
-    pub fn new(inner: AAMap<XmerIndexableArray<ZGridSubtable<'a>>>) -> Self {
-        Self(inner)
+    /// Convert this uninitialized [`ZGridDB`]
+    /// to an uninitialized version of its inner field.
+    pub fn as_uninit_inner(this: &mut MaybeUninit<Self>) -> &mut AAMap<XmerIndexableArray<MaybeUninit<ZGridSubtable<'a>>>> {
+        // SAFETY: ZGridDB has #[repr(transparent)] over its inner field.
+        unsafe { 
+            &mut *this.as_mut_ptr().cast::<AAMap<XmerIndexableArray<MaybeUninit<ZGridSubtable<'_>>>>>()
+        }
     }
     /// Moral equivalent of implementing deserialization on [`ZGridDB`],
     /// but with a memory arena to put dynamically allocated subtables into.

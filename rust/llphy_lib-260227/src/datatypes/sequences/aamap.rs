@@ -43,6 +43,7 @@ use std::{
 /// ```
 #[derive(Clone, Default, PartialEq)]
 #[derive(BorshSerialize, BorshDeserialize)]
+#[repr(transparent)]
 pub struct AAMap<T>(pub [T; AMINOACIDS.len()]);
 impl<T> AAMap<T> {
     /// Iterate over (aa, &value) pairs, like a regular map.

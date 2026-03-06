@@ -1,13 +1,19 @@
 //! Module defining [`PairFreqDB`],
 //! a `(aa_x, gap_length, xy_orientation, aa_y)`-indexable
 //! collection of [`PairFreqDBEntry`]s.
-//! 
+//!
 //! (see [`PairFreqDB`] for what `xy_orientation` means).
-use std::ops::{Deref, DerefMut};
 use borsh::{BorshDeserialize, BorshSerialize};
+use std::{
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+    ptr::addr_of_mut,
+};
 
-use crate::{datatypes::{AAMap, MAX_XMER}, featurizer::grid_scorer::PairFreqDBEntry};
-
+use crate::{
+    datatypes::{AAMap, MAX_XMER},
+    featurizer::grid_scorer::PairFreqDBEntry,
+};
 
 /// The number of `gap_length`-indexable tables in a [`PairFreqDB`].
 ///
@@ -26,6 +32,7 @@ const PAIR_FREQ_DB_LEN: usize = MAX_XMER + 1;
 /// - `gap_length` can be any number in `0..=MAX_XMER`.
 ///   The inner array is one longer than an `xmer`-indexable array.
 #[derive(BorshDeserialize, BorshSerialize, PartialEq)]
+#[repr(transparent)]
 pub struct PairFreqDB(AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>);
 /// A substructure of [`PairFreqDB`] that organizes entries based
 /// on the `xy_orientation` (whether residue `y` is N-terminal or
@@ -51,26 +58,52 @@ impl DerefMut for PairFreqDB {
     }
 }
 impl PairFreqDB {
-    /// Get a new [`PairFreqDB`] struct that is filled with `f64::NAN`.
-    pub fn new_nan_filled() -> Self {
-        PairFreqDB(AAMap(
-            [const {
-                [const {
-                    PairFreqSubtable {
-                        c_terminal_mapping: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
-                        n_terminal_mapping: AAMap([const { PairFreqDBEntry::new_nan_filled() }; 20]),
+    /// Given space for a new [`PairFreqDB`] table,
+    /// initialize all its entries to be `f64::NAN`s.
+    pub fn init_with_nans(this: &mut MaybeUninit<Self>) -> &mut Self {
+        // SAFETY: PairFreqDB has #[repr(transparent)] AAMap([_; PAIR_FREQ_DB_LEN])
+        //         AAMap has #[repr(transparent)] over [_; 20]
+        //         no other initialization guarantees
+        let table = unsafe {
+            &mut *this
+                .as_mut_ptr()
+                .cast::<[[MaybeUninit<PairFreqSubtable>; PAIR_FREQ_DB_LEN]; 20]>()
+        };
+        for arr in table {
+            for subtable in arr {
+                let subtable = subtable.as_mut_ptr();
+                let n_terminal_mapping: *mut AAMap<PairFreqDBEntry>;
+                let c_terminal_mapping: *mut AAMap<PairFreqDBEntry>;
+
+                // SAFETY: `subtable` points to a valid memory region with size/align
+                //         appropriate `PairFreqSubtable` (see all the #[repr(transparent)]s)
+                unsafe {
+                    n_terminal_mapping = addr_of_mut!((*subtable).n_terminal_mapping);
+                    c_terminal_mapping = addr_of_mut!((*subtable).n_terminal_mapping);
+                }
+                for mapping in [n_terminal_mapping, c_terminal_mapping] {
+                    // SAFETY: AAMap has #[repr(trasparent)] over [_; 20]
+                    let mapping =
+                        unsafe { &mut *mapping.cast::<[MaybeUninit<PairFreqDBEntry>; 20]>() };
+                    for slot in mapping {
+                        slot.write(PairFreqDBEntry::new_nan_filled());
                     }
-                }; PAIR_FREQ_DB_LEN]
-            }; 20],
-        ))
+                }
+            }
+        }
+        // SAFETY: just initialized all slots
+        unsafe { this.assume_init_mut() }
     }
     /// False if there are `f64::NAN`s in any entry.
     pub fn is_nan_free(&self) -> bool {
         !self.0.values().flatten().any(|subtable| {
-            [subtable.c_terminal_mapping.values(), subtable.n_terminal_mapping.values()]
-                .into_iter()
-                .flatten()
-                .any(|e| !e.is_nan_free())
+            [
+                subtable.c_terminal_mapping.values(),
+                subtable.n_terminal_mapping.values(),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|e| !e.is_nan_free())
         })
     }
 }

@@ -9,6 +9,7 @@ use crate::datatypes::MAX_XMER;
 ///
 /// See also [`XmerSize`].
 #[derive(BorshDeserialize, BorshSerialize, PartialEq)]
+#[repr(transparent)]
 pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 /// A newtype wrapper that indicates a number is
 /// in `1..=MAX_XMER`. For [`XmerIndexableArray`].
@@ -39,6 +40,13 @@ impl<'a, T> IntoIterator for &'a XmerIndexableArray<T> {
     type Item = &'a T;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+impl<'a, T> IntoIterator for &'a mut XmerIndexableArray<T> {
+    type IntoIter = std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
     }
 }
 impl XmerSize {
