@@ -159,4 +159,27 @@ macro_rules! maybe_quiet {
         if $quiet {$func::<true>($($args)*)} else {$func::<false>($($args)*)}
     };
 }
-use maybe_quiet;
+macro_rules! derive_borsh_de_from {
+    ($my_ty:ty as $std_ty:ty, $from_impl:expr) => {
+        impl borsh::BorshDeserialize for $my_ty {
+            fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
+                <$std_ty as borsh::BorshDeserialize>::deserialize(buf).map($from_impl)
+            }
+            fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+                <$std_ty as borsh::BorshDeserialize>::deserialize_reader(reader).map($from_impl)
+            }
+        }
+    };
+}
+macro_rules! derive_borsh_se_into {
+    ($my_ty:ty as $std_ty:ty, |$this:ident| $to_impl:expr) => {
+        impl borsh::BorshSerialize for $my_ty {
+            fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+                use borsh::BorshSerialize as _;
+                let $this = self;
+                ($to_impl).serialize(writer)
+            }
+        }
+    };
+}
+use {maybe_quiet, derive_borsh_de_from, derive_borsh_se_into};

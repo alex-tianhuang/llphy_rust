@@ -1,6 +1,7 @@
 //! Module defining [`PairFreqDBEntry`] and [`PairFreqEntrySum`]
 //! using `#[portable_simd]`.
 use std::{ops::AddAssign, simd::{f64x2, f64x4}};
+use crate::{derive_borsh_de_from, derive_borsh_se_into};
 
 /// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
 /// 
@@ -12,8 +13,8 @@ use std::{ops::AddAssign, simd::{f64x2, f64x4}};
 /// --------
 /// The reason this contains data for two features instead
 /// of separating them out nicely is because a pair of zscores
-/// are required to index into [`super::ZGridDB`] and so it is a
-/// win for cache locality to get them loaded in one struct.
+/// are required to index into [`crate::featurizer::grid_scorer::ZGridDB`]
+/// and so it is a win for cache locality to get them loaded in one struct.
 pub struct PairFreqDBEntry(f64x4);
 /// An accumulator struct for taking the sum of many [`PairFreqDBEntry`]s.
 pub struct PairFreqEntrySum(f64x4);
@@ -62,3 +63,5 @@ impl AddAssign<&PairFreqDBEntry> for PairFreqEntrySum {
         self.0 += &rhs.0
     }
 }
+derive_borsh_de_from!(PairFreqDBEntry as [f64; 4], |a| PairFreqDBEntry(f64x4::from_array(a)));
+derive_borsh_se_into!(PairFreqDBEntry as [f64; 4], |this| this.0.as_array());

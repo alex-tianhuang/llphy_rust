@@ -1,7 +1,7 @@
 //! Module defining [`PairFreqDBEntry`] and [`PairFreqEntrySum`]
 //! without the use of the `#[portable_simd]` feature.
+use crate::{derive_borsh_de_from, derive_borsh_se_into};
 use std::ops::AddAssign;
-
 /// Weights for each `(aa_x, gap_length, xy_orientation, aa_y)` key.
 ///
 /// Dev note
@@ -78,3 +78,20 @@ impl AddAssign<&PairFreqDBEntry> for PairFreqEntrySum {
         self.total_b += rhs.total_b;
     }
 }
+derive_borsh_de_from!(PairFreqDBEntry as [f64; 4], |[
+    weight_a,
+    weight_b,
+    total_a,
+    total_b,
+]| PairFreqDBEntry {
+    weight_a,
+    weight_b,
+    total_a,
+    total_b
+});
+derive_borsh_se_into!(PairFreqDBEntry as [f64; 4], |this| [
+    this.weight_a,
+    this.weight_b,
+    this.total_a,
+    this.total_b
+]);

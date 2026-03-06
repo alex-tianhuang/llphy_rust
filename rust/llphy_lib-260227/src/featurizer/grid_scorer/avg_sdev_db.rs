@@ -2,11 +2,14 @@
 //! a wrapper around a an `(aa, xmer)`-indexable
 //! collection of [`AvgSdevDBEntry`]s.
 use std::ops::{Deref, DerefMut};
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::{datatypes::{AAMap, MAX_XMER}, featurizer::grid_scorer::{XmerIndexableArray, AvgSdevDBEntry}};
 
 
 /// A struct containing [`AvgSdevDBEntry`] for each
 /// `(aa, xmer)` key.
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct AvgSdevDB(AAMap<XmerIndexableArray<AvgSdevDBEntry>>);
 impl Deref for AvgSdevDB {
     type Target = AAMap<XmerIndexableArray<AvgSdevDBEntry>>;

@@ -4,6 +4,8 @@
 //! 
 //! (see [`PairFreqDB`] for what `xy_orientation` means).
 use std::ops::{Deref, DerefMut};
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::{datatypes::{AAMap, MAX_XMER}, featurizer::grid_scorer::PairFreqDBEntry};
 
 
@@ -23,10 +25,12 @@ const PAIR_FREQ_DB_LEN: usize = MAX_XMER + 1;
 ///   of `aa_x`. In practice I just do both so it doesn't matter.
 /// - `gap_length` can be any number in `0..=MAX_XMER`.
 ///   The inner array is one longer than an `xmer`-indexable array.
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct PairFreqDB(AAMap<[PairFreqSubtable; PAIR_FREQ_DB_LEN]>);
 /// A substructure of [`PairFreqDB`] that organizes entries based
 /// on the `xy_orientation` (whether residue `y` is N-terminal or
 /// C-terminal of `x`).
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct PairFreqSubtable {
     // If `aa_y` is N-terminal to `aa_x`
     // index into this field with `aa_y`.

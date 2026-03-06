@@ -1,6 +1,6 @@
 //! Module defining [`AvgSdevDBEntry`]
 //! without the use of the `#[portable_simd]` feature.
-
+use crate::{derive_borsh_de_from, derive_borsh_se_into};
 /// A struct containing average and inverse standard deviations
 /// of two features for a given `(aa, xmer)` key.
 ///
@@ -57,3 +57,16 @@ impl AvgSdevDBEntry {
         [zscore_a, zscore_b]
     }
 }
+derive_borsh_de_from!(AvgSdevDBEntry as [[f64; 2]; 2], |[
+    [avg_a, avg_b],
+    [invstd_a, invstd_b],
+]| AvgSdevDBEntry {
+    avg_a,
+    avg_b,
+    invstd_a,
+    invstd_b
+});
+derive_borsh_se_into!(AvgSdevDBEntry as [[f64; 2]; 2], |this| [
+    [this.avg_a, this.avg_b],
+    [this.invstd_a, this.invstd_b]
+]);

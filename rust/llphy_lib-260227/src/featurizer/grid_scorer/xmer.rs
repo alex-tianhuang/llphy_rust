@@ -1,11 +1,14 @@
 //! Module defining [`XmerIndexableArray`] and [`XmerSize`].
 use std::{num::NonZero, ops::{Index, IndexMut}};
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::datatypes::MAX_XMER;
 
 /// A newtype wrapper that indicates something is
 /// accessible via an index in `1..=MAX_XMER`.
 ///
 /// See also [`XmerSize`].
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 /// A newtype wrapper that indicates a number is
 /// in `1..=MAX_XMER`. For [`XmerIndexableArray`].

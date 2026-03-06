@@ -17,7 +17,7 @@ pub use z_grid_db::ZGridDB;
 mod simd;
 #[cfg(feature = "simd")]
 pub use simd::{
-    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,AvgSdevDBEntry, PairFreqDBEntry
+    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
