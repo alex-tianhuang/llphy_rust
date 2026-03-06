@@ -20,7 +20,16 @@ pub fn read_file_into_global(path: &Path) -> Result<std::vec::Vec<u8>, Error>{
     unsafe {
         buf.set_len(filesize);
     }
-    file.read_exact(&mut buf[..])?;
+    match file.read_exact(&mut buf) {
+        Ok(()) => (),
+        // This probably doesn't happen but I don't know if
+        // metadata is guaranteed to be accurate.
+        Err(ref e) if matches!(e.kind(), ErrorKind::UnexpectedEof) => {
+            let actual_size = file.seek(std::io::SeekFrom::End(0))?;
+            return Err(wrong_file_size(buf.len() as _, actual_size));
+        }
+        Err(e) => return Err(e.into()),
+    };
     ensure_file_at_eof(file, buf.len() as u64)?;
     Ok(buf)
 }
