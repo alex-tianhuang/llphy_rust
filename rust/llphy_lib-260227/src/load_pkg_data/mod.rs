@@ -1,14 +1,13 @@
 mod legacy;
 use crate::{
-    datatypes::ModelTrainingBase,
+    datatypes::{ModelTrainingBase, ReferenceFeatureMatrix, ScoreType},
     featurizer::{GridDecoder, GridScorer},
     io::read_file_into_global,
-    leak_vec,
+    leak_vec, post_processor::PostProcessor,
 };
 use anyhow::Error;
 use borsh::BorshDeserialize;
 use bumpalo::{Bump, collections::Vec};
-pub use legacy::load_post_processor;
 use pyo3::Python;
 use std::{fs, path::Path};
 
@@ -48,4 +47,28 @@ pub fn load_grid_scorer<'a>(
     let filepath = root.join(pair_name).join("gridscorer.bin");
     let bytes = read_file_into_global(&filepath)?;
     GridScorer::deserialize(&mut &*bytes, z_grid_db_arena)
+}
+/// Replacing [`legacy::load_post_processor`].
+pub fn load_post_processor(
+    score_type: ScoreType,
+    model_train_base: ModelTrainingBase,
+    arena: &Bump,
+) -> Result<PostProcessor<'_>, Error> {
+    match score_type {
+        ScoreType::Raw => Ok(PostProcessor::Raw),
+        ScoreType::ZScore => load_reference_scores(model_train_base, arena)
+            .map(|ref_scores| PostProcessor::new_zscore(ref_scores, arena)),
+        ScoreType::Percentile => {
+            load_reference_scores(model_train_base, arena).map(PostProcessor::new_percentile)
+        }
+    }
+}
+/// Replacing [`legacy::load_reference_scores`].
+pub fn load_reference_scores(model_train_base: ModelTrainingBase, arena: &Bump) -> Result<ReferenceFeatureMatrix<'_>, Error> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("pkg_data")
+        .join("human_reference_data");
+    let filepath = root.join(format!("{}.distr.bin", model_train_base));
+    let bytes = read_file_into_global(&filepath)?;
+    ReferenceFeatureMatrix::deserialize(&mut &*bytes, arena)
 }
