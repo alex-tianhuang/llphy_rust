@@ -1,14 +1,18 @@
 //! Module defining a thresholds container for
 //! converting grid-scores to integer values.
-//! 
+//!
 //! See [`Thresholds`] and [`ThresholdPair`].
-use std::ops::{Deref, DerefMut};
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::datatypes::AAMap;
+use std::ops::{Deref, DerefMut};
 
 /// A collection of [`ThresholdPair`]s for each aminoacid.
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct Thresholds(AAMap<ThresholdPair>);
 /// An upper and lower grid-score threshold
 /// that converts a grid-score to an integer value.
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct ThresholdPair {
     pub upper: f64,
     pub lower: f64,
@@ -38,7 +42,11 @@ impl Thresholds {
     }
     /// True if there are `f64::NAN`s in any slot of the thresholds.
     pub fn is_nan_free(&self) -> bool {
-        !self.0.0.iter().any(|t| t.upper.is_nan() || t.lower.is_nan())
+        !self
+            .0
+            .0
+            .iter()
+            .any(|t| t.upper.is_nan() || t.lower.is_nan())
     }
 }
 impl ThresholdPair {
@@ -47,7 +55,7 @@ impl ThresholdPair {
         let Self { lower, upper } = *self;
         (grid_score > upper) as i64 - (grid_score < lower) as i64
     }
-    /// Sum the values of several grid scores. 
+    /// Sum the values of several grid scores.
     pub fn score_sites(&self, grid_scores: &[f64]) -> i64 {
         grid_scores.iter().map(|x| self.score_site(*x)).sum::<i64>()
     }
