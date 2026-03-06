@@ -1,8 +1,5 @@
 [project]
 name = "llphyscore"
-dependencies = [
-    "numpy"
-]
 version = "1.0.0"
 
 [tool.maturin]
