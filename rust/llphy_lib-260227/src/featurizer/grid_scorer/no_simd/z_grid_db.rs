@@ -1,10 +1,10 @@
 //! Module defining substructures of [`crate::featurizer::grid_scorer::ZGridDB`]
 //! without using `#[portable_simd]`.
+use crate::featurizer::grid_scorer::z_grid_db::{KNOWN_MAX_DATA_LEN, lookup_thorough};
 use anyhow::Error;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bumpalo::Bump;
-
-use crate::featurizer::grid_scorer::z_grid_db::lookup_thorough;
+use bytesize::ByteSize;
 use std::ops::AddAssign;
 
 /// A `(zscore_a, zscore_b)`-indexable collection of weights
@@ -103,20 +103,32 @@ impl<'a> ZGridSubtable<'a> {
         let dbl_z_offsets = <[f64; 2]>::deserialize(buf)?;
         let row_len = <usize>::deserialize(buf)?;
         let data_len = <usize>::deserialize(buf)?;
-        // TODO: add size check or convince myself there is not an attack vector here
+        if data_len > KNOWN_MAX_DATA_LEN {
+            let cell_size = size_of::<Option<ZGridDBEntry>>() as u64;
+            let asked_for = ByteSize::b(cell_size * data_len as u64);
+            let expected = ByteSize::b(cell_size * KNOWN_MAX_DATA_LEN as u64);
+            return Err(Error::msg(format!(
+                "[ZGridSubtable::deserialize] expected at most {:?} to be allocated, but asking for {:?}",
+                expected, asked_for
+            )));
+        }
         let data = arena.alloc_slice_try_fill_with(data_len, |_| {
             let [weight_a, weight_b, weight_total, flag] = <[i64; 4]>::deserialize(buf)?;
             if flag != 0 {
                 <Result<_, Error>>::Ok(Some(ZGridDBEntry {
                     weight_a,
                     weight_b,
-                    weight_total
+                    weight_total,
                 }))
             } else {
                 <Result<_, Error>>::Ok(None)
             }
         })?;
-        Ok(ZGridSubtable { dbl_z_offsets, row_len, data })
+        Ok(ZGridSubtable {
+            dbl_z_offsets,
+            row_len,
+            data,
+        })
     }
 }
 impl BorshSerialize for ZGridSubtable<'_> {
@@ -126,12 +138,8 @@ impl BorshSerialize for ZGridSubtable<'_> {
         self.data.len().serialize(writer)?;
         for cell in self.data {
             let array_repr = match cell {
-                Some(entry) => {
-                    [entry.weight_a, entry.weight_b, entry.weight_total, 1]
-                },
-                None => {
-                    [0; 4]
-                }
+                Some(entry) => [entry.weight_a, entry.weight_b, entry.weight_total, 1],
+                None => [0; 4],
             };
             array_repr.serialize(writer)?;
         }

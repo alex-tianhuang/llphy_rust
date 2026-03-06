@@ -22,6 +22,14 @@ use crate::{
 /// and then `zscore_b`, NOT `zscore_b` then `zscore_a`.
 #[derive(PartialEq)]
 pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
+/// The maximum number of Z-score cells in `ZGridSubtable`s
+/// derived from Cai's old `LLPhyScore` executable.
+/// 
+/// Unless the `gridscorer.bin` files get corrupted or
+/// somebody brave attempts to add new biophysical features,
+/// this number should never be exceeded when deserializing
+/// a `ZGridDB`.
+pub const KNOWN_MAX_DATA_LEN: usize = 575;
 impl<'a> Deref for ZGridDB<'a> {
     type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;
     fn deref(&self) -> &Self::Target {
