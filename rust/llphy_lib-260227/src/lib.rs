@@ -7,21 +7,20 @@
 //!
 //! [python library]: https://github.com/julie-forman-kay-lab/LLPhyScore
 use std::{
-    env::args_os,
-    mem::{self, ManuallyDrop},
-    path::PathBuf,
+    env::args_os, fs::File, io::Read, mem::{self, ManuallyDrop}, path::{Path, PathBuf}
 };
 mod io;
 mod load_pkg_data;
 mod post_processor;
 use crate::{
-    datatypes::{DEFAULT_FEATURES, ModelTrainingBase, ScoreType},
+    datatypes::{DEFAULT_FEATURES, ModelTrainingBase, PAIR_NAMES_AND_FEATURE_NAMES, ReferenceFeatureMatrix, ScoreType},
     fasta::read_fasta,
-    featurizer::featurize,
-    load_pkg_data::{load_grid_decoders, load_post_processor},
-    output::write_output,
+    featurizer::{GridDecoder, GridScorer, featurize},
+    load_pkg_data::{load_grid_decoders, load_grid_scorer, load_post_processor},
+    output::write_output, post_processor::PostProcessor,
 };
 use anyhow::{Context, Error};
+use borsh::{BorshDeserialize, BorshSerialize};
 use bumpalo::{Bump, collections::Vec};
 use clap::Parser;
 mod datatypes;
@@ -73,6 +72,7 @@ pub struct Args {
 fn _module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(main_cli, m)?)?;
     m.add_function(wrap_pyfunction!(run_fasta_scorer, m)?)?;
+    m.add_function(wrap_pyfunction!(cleanup_pkg_data, m)?)?;
     Ok(())
 }
 /// Entry point for the CLI that computes biophysical features.
@@ -137,7 +137,76 @@ fn run_fasta_scorer(py: Python, args: Args) -> Result<(), Error> {
     let matrix = post_processor.post_process(matrix, &arena)?;
     write_output(output_file, sequences, matrix, &arena)
 }
-
+/// Temporary utility method for transforming old package data
+/// into new, nicer package data (e.g. model weights, zgrids, etc.)
+#[pyfunction]
+pub fn cleanup_pkg_data(py: Python) -> Result<(), Error> {
+    #[cfg(debug_assertions)]
+    return Err(Error::msg("ABORTING: this function causes a segfault on debug builds because it asks for huge stack sizes."));
+    let mut arena = Bump::new();
+    let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("pkg_data");
+    let mut bytes = std::vec::Vec::new();
+    for (pair_name, _) in PAIR_NAMES_AND_FEATURE_NAMES {
+        arena.reset();
+        let grid_scorer = Box::new(load_grid_scorer(pair_name, &arena)?);
+        let subdir = data_dir.join("feature_pairs").join(pair_name);
+        let filepath = subdir.join(format!("gridscorer.bin"));
+        bytes.clear();
+        if filepath.exists() {
+            let mut file = File::open(&filepath)?;
+            file.read_to_end(&mut bytes)?;
+        } else {
+            grid_scorer.serialize(&mut bytes)?;
+        }
+        let round_trip = Box::new(GridScorer::deserialize(&mut &*bytes, &arena)?);
+        assert!(round_trip == grid_scorer);
+        if !filepath.exists() {
+            std::fs::create_dir_all(&subdir)?;
+            let mut file = File::options().create(true).truncate(true).write(true).open(&filepath)?;
+            grid_scorer.serialize(&mut file)?;
+        }
+    }
+    for model_train_base in [ModelTrainingBase::Human, ModelTrainingBase::HumanPDB, ModelTrainingBase::PDB] {
+        arena.reset();
+        let grid_decoders = load_grid_decoders(model_train_base, &arena, py)?;
+        for (pair_name, grid_decoder_pair) in grid_decoders {
+            let subdir = data_dir.join("feature_pairs").join(pair_name);
+            let filepath = subdir.join(format!("{}.model.bin", model_train_base));
+            bytes.clear();
+            if filepath.exists() {
+                let mut file = File::open(&filepath)?;
+                file.read_to_end(&mut bytes)?;
+            } else {
+                grid_decoder_pair.serialize(&mut bytes)?;
+            }
+            let round_trip = <[GridDecoder; 2]>::deserialize(&mut &*bytes)?;
+            assert!(&round_trip == grid_decoder_pair);
+            if !filepath.exists() {
+                let mut file = File::options().create(true).truncate(true).write(true).open(&filepath)?;
+                grid_decoder_pair.serialize(&mut file)?;
+            }
+        }
+        arena.reset();
+        let PostProcessor::Percentile(matrix) = load_post_processor(ScoreType::Percentile, model_train_base, &arena)? else {
+            unreachable!()
+        };
+        let filepath = data_dir.join("human_reference_data").join(format!("{}.distr.bin", model_train_base));
+        bytes.clear();
+        if filepath.exists() {
+            let mut file = File::open(&filepath)?;
+            file.read_to_end(&mut bytes)?;
+        } else {
+            matrix.serialize(&mut bytes)?;
+        }
+        let round_trip = ReferenceFeatureMatrix::deserialize(&mut &*bytes, &arena)?;
+        assert!(round_trip == matrix);
+        if !filepath.exists() {
+            let mut file = File::options().create(true).truncate(true).write(true).open(&filepath)?;
+            matrix.serialize(&mut file)?;
+        }
+    }
+    Ok(())
+}
 /// Leak a [`Vec`] managed by an arena into a slice
 /// that lives for as long as the arena does not reset.
 fn leak_vec<'a, T>(buf: Vec<'a, T>) -> &'a mut [T] {
