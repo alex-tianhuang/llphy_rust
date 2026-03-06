@@ -6,4 +6,3 @@ pub use z_grid_db::{ZGridDBEntry, ZGridSubtable, ZGridEntrySum};
 mod z_grid_db;
 mod avg_sdev_db;
 mod pair_freq_db;
-mod xmer;
