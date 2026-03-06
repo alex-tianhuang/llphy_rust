@@ -4,14 +4,14 @@
 //!
 //! Separated from simd/non-simd specific implementations.
 
-use std::ops::{Deref, DerefMut};
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::Bump;
+use std::ops::{Deref, DerefMut};
 
 use crate::{
     datatypes::AAMap,
-    featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable, deserialize_subtable},
+    featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable},
 };
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
@@ -37,22 +37,22 @@ impl<'a> ZGridDB<'a> {
     pub fn new(inner: AAMap<XmerIndexableArray<ZGridSubtable<'a>>>) -> Self {
         Self(inner)
     }
+    /// Moral equivalent of implementing deserialization on [`ZGridDB`],
+    /// but with a memory arena to put dynamically allocated subtables into.
+    pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<Self, Error> {
+        let mut arr = [const { None }; 20];
+        for slot in arr.iter_mut() {
+            let mut arr = [const { None }; _];
+            for slot in arr.iter_mut() {
+                let subtable = ZGridSubtable::deserialize(buf, arena)?;
+                *slot = Some(subtable)
+            }
+            *slot = Some(XmerIndexableArray::new(arr.map(Option::unwrap)))
+        }
+        Ok(ZGridDB(AAMap(arr.map(Option::unwrap))))
+    }
 }
 
-/// Moral equivalent of implementing deserialization on [`ZGridDB`],
-/// but with a memory arena to put dynamically allocated subtables into.
-pub fn deserialize_z_grid_db<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<ZGridDB<'a>, Error> {
-    let mut arr = [const { None }; 20];
-    for slot in arr.iter_mut() {
-        let mut arr = [const { None }; _];
-        for slot in arr.iter_mut() {
-            let subtable = deserialize_subtable(buf, arena)?;
-            *slot = Some(subtable)
-        }
-        *slot = Some(XmerIndexableArray::new(arr.map(Option::unwrap)))
-    }
-    Ok(ZGridDB(AAMap(arr.map(Option::unwrap))))
-}
 impl BorshSerialize for ZGridDB<'_> {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         for arr in self.values() {

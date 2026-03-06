@@ -96,7 +96,48 @@ impl<'a> ZGridSubtable<'a> {
         let coord_b = dbl_zscores[1] - self.dbl_z_offsets[1];
         lookup_thorough(self.data, self.row_len, Option::as_ref, coord_a, coord_b)
     }
+    /// Moral equivalent of implementing deserialize on [`ZGridSubtable`],
+    /// but uses a memory arena to hold the dynamically sized subtable entries.
+    pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<Self, Error> {
+        let dbl_z_offsets = <[f64; 2]>::deserialize(buf)?;
+        let row_len = <usize>::deserialize(buf)?;
+        let data_len = <usize>::deserialize(buf)?;
+        // TODO: add size check or convince myself there is not an attack vector here
+        let data = arena.alloc_slice_try_fill_with(data_len, |_| {
+            let [weight_a, weight_b, weight_total, flag] = <[i64; 4]>::deserialize(buf)?;
+            if flag != 0 {
+                <Result<_, Error>>::Ok(Some(ZGridDBEntry {
+                    weight_a,
+                    weight_b,
+                    weight_total
+                }))
+            } else {
+                <Result<_, Error>>::Ok(None)
+            }
+        })?;
+        Ok(ZGridSubtable { dbl_z_offsets, row_len, data })
+    }
 }
+impl BorshSerialize for ZGridSubtable<'_> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.dbl_z_offsets.serialize(writer)?;
+        self.row_len.serialize(writer)?;
+        self.data.len().serialize(writer)?;
+        for cell in self.data {
+            let array_repr = match cell {
+                Some(entry) => {
+                    [entry.weight_a, entry.weight_b, entry.weight_total, 1]
+                },
+                None => {
+                    [0; 4]
+                }
+            };
+            array_repr.serialize(writer)?;
+        }
+        Ok(())
+    }
+}
+
 impl ZGridDBEntry {
     /// Get a new, occupied [`ZGridDBEntry`] from its three fields.
     ///
@@ -152,45 +193,5 @@ impl AddAssign<&ZGridDBEntry> for ZGridEntrySum {
         self.weight_a += rhs.weight_a;
         self.weight_b += rhs.weight_b;
         self.weight_total += rhs.weight_total;
-    }
-}
-/// Moral equivalent of implementing deserialize on [`ZGridSubtable`],
-/// but uses a memory arena to hold the dynamically sized subtable entries.
-pub fn deserialize_subtable<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<ZGridSubtable<'a>, Error> {
-    let dbl_z_offsets = <[f64; 2]>::deserialize(buf)?;
-    let row_len = <usize>::deserialize(buf)?;
-    let data_len = <usize>::deserialize(buf)?;
-    // TODO: add size check or convince myself there is not an attack vector here
-    let data = arena.alloc_slice_try_fill_with(data_len, |_| {
-        let [weight_a, weight_b, weight_total, flag] = <[i64; 4]>::deserialize(buf)?;
-        if flag != 0 {
-            <Result<_, Error>>::Ok(Some(ZGridDBEntry {
-                weight_a,
-                weight_b,
-                weight_total
-            }))
-        } else {
-            <Result<_, Error>>::Ok(None)
-        }
-    })?;
-    Ok(ZGridSubtable { dbl_z_offsets, row_len, data })
-}
-impl BorshSerialize for ZGridSubtable<'_> {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        self.dbl_z_offsets.serialize(writer)?;
-        self.row_len.serialize(writer)?;
-        self.data.len().serialize(writer)?;
-        for cell in self.data {
-            let array_repr = match cell {
-                Some(entry) => {
-                    [entry.weight_a, entry.weight_b, entry.weight_total, 1]
-                },
-                None => {
-                    [0; 4]
-                }
-            };
-            array_repr.serialize(writer)?;
-        }
-        Ok(())
     }
 }

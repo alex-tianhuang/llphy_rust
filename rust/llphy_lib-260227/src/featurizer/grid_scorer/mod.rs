@@ -1,6 +1,7 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 use crate::{
-    datatypes::{AAIndex, AAMap, MAX_XMER}, featurizer::grid_scorer::z_grid_db::deserialize_z_grid_db, leak_vec
+    datatypes::{AAIndex, AAMap, MAX_XMER},
+    leak_vec,
 };
 use anyhow::Error;
 use borsh::BorshSerialize;
@@ -9,23 +10,23 @@ use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
 mod avg_sdev_db;
 pub use avg_sdev_db::AvgSdevDB;
+mod pair_freq_db;
 mod xmer;
 mod z_grid_db;
-mod pair_freq_db;
+use borsh::BorshDeserialize;
 pub use pair_freq_db::PairFreqDB;
 pub use z_grid_db::ZGridDB;
-use borsh::BorshDeserialize;
 #[cfg(feature = "simd")]
 mod simd;
 #[cfg(feature = "simd")]
 pub use simd::{
-    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry, deserialize_subtable
+    AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry, deserialize_subtable
+    AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
@@ -41,15 +42,11 @@ pub struct GridScore<'a> {
     pub feature_a_scores: AAMap<&'a [f64]>,
     pub feature_b_scores: AAMap<&'a [f64]>,
 }
-impl GridScorer<'_> {
+impl<'a> GridScorer<'a> {
     /// Turn a sequence into a biophysical feature grid (currently [`GridScore`])
     /// by looking at the average value of some given biophysical feature on windows
     /// centered on each residue type.
-    pub fn score_sequence<'a>(
-        &self,
-        sequence: &[AAIndex],
-        arena: &'a Bump,
-    ) -> GridScore<'a> {
+    pub fn score_sequence<'b>(&self, sequence: &[AAIndex], arena: &'b Bump) -> GridScore<'b> {
         let Some(n_sites) = sequence.len().checked_sub(2) else {
             return GridScore {
                 feature_a_scores: AAMap([&[]; 20]),
@@ -98,15 +95,20 @@ impl GridScorer<'_> {
             feature_b_scores: AAMap(feature_b_scores.0.map(|v| leak_vec(v) as &[_])),
         }
     }
+    /// Moral equivalent of implementing deserialization on [`GridScorer`],
+    /// but with a memory arena to put dynamically allocated subtables into.
+    pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<Self, Error> {
+        let pair_freqs = <PairFreqDB>::deserialize(buf)?;
+        let avg_sdevs = <AvgSdevDB>::deserialize(buf)?;
+        let z_grid = ZGridDB::deserialize(buf, arena)?;
+        Ok(GridScorer {
+            pair_freqs,
+            avg_sdevs,
+            z_grid,
+        })
+    }
 }
-/// Moral equivalent of implementing deserialization on [`GridScorer`],
-/// but with a memory arena to put dynamically allocated subtables into.
-pub fn deserialize_grid_scorer<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<GridScorer<'a>, Error> {
-    let pair_freqs = <PairFreqDB>::deserialize(buf)?;
-    let avg_sdevs = <AvgSdevDB>::deserialize(buf)?;
-    let z_grid = deserialize_z_grid_db(buf, arena)?;
-    Ok(GridScorer { pair_freqs, avg_sdevs, z_grid })
-}
+
 impl BorshSerialize for GridScorer<'_> {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         self.pair_freqs.serialize(writer)?;
