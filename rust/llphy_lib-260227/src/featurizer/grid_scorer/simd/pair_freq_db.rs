@@ -64,4 +64,4 @@ impl AddAssign<&PairFreqDBEntry> for PairFreqEntrySum {
     }
 }
 derive_borsh_de_from!(PairFreqDBEntry as [f64; 4], |a| PairFreqDBEntry(f64x4::from_array(a)));
-derive_borsh_se_into!(PairFreqDBEntry as [f64; 4], |this| this.0.as_array());
+derive_borsh_se_into!(PairFreqDBEntry as [f64; 4], |this| this.0.to_array());

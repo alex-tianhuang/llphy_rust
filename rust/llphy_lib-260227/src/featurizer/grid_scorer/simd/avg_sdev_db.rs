@@ -59,5 +59,5 @@ derive_borsh_de_from!(AvgSdevDBEntry as [[f64; 2]; 2], |[avgs, invstds]| {
         invstds: f64x2::from_array(invstds),
     }
 });
-derive_borsh_se_into!(AvgSdevDBEntry as [[f64; 2]; 2], |this| [this.avgs.as_array(), this.invstds.as_array()]);
+derive_borsh_se_into!(AvgSdevDBEntry as [[f64; 2]; 2], |this| [this.avgs.to_array(), this.invstds.to_array()]);
 
