@@ -19,13 +19,13 @@ use borsh::BorshDeserialize;
 mod simd;
 #[cfg(feature = "simd")]
 pub use simd::{
-    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
+    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry, deserialize_subtable
 };
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry
+    PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable, AvgSdevDBEntry, PairFreqDBEntry, deserialize_subtable
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)

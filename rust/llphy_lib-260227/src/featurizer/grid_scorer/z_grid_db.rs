@@ -11,7 +11,7 @@ use bumpalo::Bump;
 
 use crate::{
     datatypes::AAMap,
-    featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable, no_simd::deserialize_subtable},
+    featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable, deserialize_subtable},
 };
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
