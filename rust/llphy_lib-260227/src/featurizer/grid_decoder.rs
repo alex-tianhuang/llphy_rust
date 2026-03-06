@@ -1,9 +1,11 @@
 //! Module defining [`GridDecoder`].
+use borsh::{BorshDeserialize, BorshSerialize};
 use crate::datatypes::AAMap;
 use crate::featurizer::thresholds::Thresholds;
 
-/// Turns a subarray of a [`GridScore`](crate::features::GridScore)
+/// Turns a subarray of a [`GridScore`](crate::featurizer::grid_scorer::GridScore)
 /// into a sequence-level numeric feature.
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct GridDecoder {
     pub sign: i8,
     pub thresholds: Thresholds,

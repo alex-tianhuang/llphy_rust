@@ -1,5 +1,6 @@
 //! Module defining the [`AAMap`] type.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, de::Visitor};
 
 use crate::datatypes::{AAIndex, AMINOACIDS, Aminoacid};
@@ -41,6 +42,7 @@ use std::{
 /// }
 /// ```
 #[derive(Clone, Default, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct AAMap<T>(pub [T; AMINOACIDS.len()]);
 impl<T> AAMap<T> {
     /// Iterate over (aa, &value) pairs, like a regular map.
