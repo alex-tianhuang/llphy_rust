@@ -8,7 +8,7 @@ use crate::datatypes::MAX_XMER;
 /// accessible via an index in `1..=MAX_XMER`.
 ///
 /// See also [`XmerSize`].
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PartialEq)]
 pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 /// A newtype wrapper that indicates a number is
 /// in `1..=MAX_XMER`. For [`XmerIndexableArray`].

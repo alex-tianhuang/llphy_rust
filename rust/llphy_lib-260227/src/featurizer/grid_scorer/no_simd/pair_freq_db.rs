@@ -10,6 +10,7 @@ use std::ops::AddAssign;
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`super::ZGridDB`] and so it is a
 /// win for cache locality to get them loaded in one struct.
+#[derive(PartialEq)]
 pub struct PairFreqDBEntry {
     weight_a: f64,
     weight_b: f64,

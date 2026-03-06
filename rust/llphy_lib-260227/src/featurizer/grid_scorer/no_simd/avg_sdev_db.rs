@@ -10,6 +10,7 @@ use crate::{derive_borsh_de_from, derive_borsh_se_into};
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`super::ZGridDB`] and so it is a
 /// win for cache locality to get them loaded in one struct.
+#[derive(PartialEq)]
 pub struct AvgSdevDBEntry {
     avg_a: f64,
     avg_b: f64,

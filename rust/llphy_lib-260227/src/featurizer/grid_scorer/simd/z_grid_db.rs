@@ -20,6 +20,7 @@ use std::simd::{
 /// without wasting too much space. In practice, about half
 /// the space is filled with empty entries, but it hopefully
 /// gives a big performance boost over binary search.
+#[derive(PartialEq)]
 pub struct ZGridSubtable<'a> {
     /// Corresponds to double the minimum z-score
     /// for features `A` then feature `B`
@@ -41,7 +42,7 @@ pub struct ZGridSubtable<'a> {
 /// The remaining integer array slot (at index 3) is for
 /// [`Self::is_occupied`], which is a boolean that checks
 /// if this field contains valid weight data.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ZGridDBEntry(i64x4);
 /// An accumulator for computing the weighted average
 /// of a bunch of [`ZGridDBEntry`]s.

@@ -15,6 +15,7 @@ use crate::{derive_borsh_de_from, derive_borsh_se_into};
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`crate::featurizer::grid_scorer::ZGridDB`]
 /// and so it is a win for cache locality to get them loaded in one struct.
+#[derive(PartialEq)]
 pub struct PairFreqDBEntry(f64x4);
 /// An accumulator struct for taking the sum of many [`PairFreqDBEntry`]s.
 pub struct PairFreqEntrySum(f64x4);

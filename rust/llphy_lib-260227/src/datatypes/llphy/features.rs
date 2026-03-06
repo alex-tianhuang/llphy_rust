@@ -41,6 +41,7 @@ pub enum PostProcessedFeatureVector<'a> {
 /// Integer feature values associated with
 /// a reference set of sequences, grouped in memory
 /// by feature rather than by sequence.
+#[derive(PartialEq)]
 pub struct ReferenceFeatureMatrix<'a> {
     pub feature_names: &'a [&'a str],
     /// The number of reference sequences that

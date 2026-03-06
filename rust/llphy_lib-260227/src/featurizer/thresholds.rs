@@ -8,11 +8,11 @@ use crate::datatypes::AAMap;
 use std::ops::{Deref, DerefMut};
 
 /// A collection of [`ThresholdPair`]s for each aminoacid.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct Thresholds(AAMap<ThresholdPair>);
 /// An upper and lower grid-score threshold
 /// that converts a grid-score to an integer value.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct ThresholdPair {
     pub upper: f64,
     pub lower: f64,

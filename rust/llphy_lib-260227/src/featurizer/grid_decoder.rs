@@ -5,7 +5,7 @@ use crate::featurizer::thresholds::Thresholds;
 
 /// Turns a subarray of a [`GridScore`](crate::featurizer::grid_scorer::GridScore)
 /// into a sequence-level numeric feature.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct GridDecoder {
     pub sign: i8,
     pub thresholds: Thresholds,

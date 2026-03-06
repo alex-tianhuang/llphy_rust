@@ -15,6 +15,7 @@ use std::ops::AddAssign;
 /// without wasting too much space. In practice, about half
 /// the space is filled with empty entries, but it hopefully
 /// gives a big performance boost over binary search.
+#[derive(PartialEq)]
 pub struct ZGridSubtable<'a> {
     /// Corresponds to double the minimum z-score
     /// for features `A` then feature `B`
@@ -28,7 +29,7 @@ pub struct ZGridSubtable<'a> {
 }
 /// An occupied slot for weights for features `a` and `b`,
 /// for some `(aa, xmer, zscore_a, zscore_b)` tuples.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ZGridDBEntry {
     weight_a: i64,
     weight_b: i64,

@@ -9,7 +9,7 @@ use crate::{datatypes::{AAMap, MAX_XMER}, featurizer::grid_scorer::{XmerIndexabl
 
 /// A struct containing [`AvgSdevDBEntry`] for each
 /// `(aa, xmer)` key.
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PartialEq)]
 pub struct AvgSdevDB(AAMap<XmerIndexableArray<AvgSdevDBEntry>>);
 impl Deref for AvgSdevDB {
     type Target = AAMap<XmerIndexableArray<AvgSdevDBEntry>>;

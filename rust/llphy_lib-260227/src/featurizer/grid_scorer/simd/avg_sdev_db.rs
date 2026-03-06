@@ -12,6 +12,7 @@ use std::simd::f64x2;
 /// of separating them out nicely is because a pair of zscores
 /// are required to index into [`crate::featurizer::grid_scorer::ZGridDB`]
 /// and so it is a win for cache locality to get them loaded in one struct.
+#[derive(PartialEq)]
 pub struct AvgSdevDBEntry {
     avgs: f64x2,
     invstds: f64x2,

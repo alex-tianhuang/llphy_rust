@@ -20,6 +20,7 @@ use crate::{
 ///
 /// The subtable is expected to be indexed by `zscore_a`
 /// and then `zscore_b`, NOT `zscore_b` then `zscore_a`.
+#[derive(PartialEq)]
 pub struct ZGridDB<'a>(AAMap<XmerIndexableArray<ZGridSubtable<'a>>>);
 impl<'a> Deref for ZGridDB<'a> {
     type Target = AAMap<XmerIndexableArray<ZGridSubtable<'a>>>;

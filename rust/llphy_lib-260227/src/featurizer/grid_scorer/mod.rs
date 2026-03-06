@@ -31,6 +31,7 @@ pub use no_simd::{
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
+#[derive(PartialEq)]
 pub struct GridScorer<'a> {
     pub pair_freqs: PairFreqDB,
     pub avg_sdevs: AvgSdevDB,

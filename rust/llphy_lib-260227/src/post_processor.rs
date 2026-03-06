@@ -1,6 +1,7 @@
 use crate::datatypes::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMatrix};
 use anyhow::Error;
 use bumpalo::Bump;
+#[derive(PartialEq)]
 pub enum PostProcessor<'a> {
     Raw,
     ZScore {
