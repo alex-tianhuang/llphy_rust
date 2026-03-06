@@ -53,6 +53,10 @@ macro_rules! map_err_on_line {
 /// Load a [`GridScorer`] from
 /// Cai's (@haocai1992) old data files.
 /// 
+/// Does it in a memory arena and then returns a reference to it.
+/// 
+/// Dev note
+/// --------
 /// Allocates into the given memory arena because
 /// `GridScorer`s are 1MB structs and I keep getting
 /// segfaults which I suspect are stack overflows.
