@@ -19,7 +19,7 @@ pub(crate) const DEFAULT_FEATURES: &'static [&'static str] = &[
 ];
 /// The default pair names and feature names that Cai's
 /// old LLPhyScore program used to organize computations.
-const PAIR_NAMES_AND_FEATURE_NAMES: &'static [(&'static str, [&'static str; 2])] = &[
+pub const PAIR_NAMES_AND_FEATURE_NAMES: &'static [(&'static str, [&'static str; 2])] = &[
     ("S2.SUMPI", ["pi-pi (short-range)", "pi-pi (long-range)"]),
     ("S3.WATER.V2", ["protein-water", "protein-carbon"]),
     (

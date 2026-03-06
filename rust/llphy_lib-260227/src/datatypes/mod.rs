@@ -3,5 +3,5 @@ pub(crate) use sequences::{AAMap, AMINOACIDS, Aminoacid, FastaEntry, aa_canonica
 mod llphy;
 pub(crate) use llphy::{
     FeatureMatrix, MAX_XMER, ModelTrainingBase, PostProcessedFeatureMatrix, ReferenceFeatureMatrix,
-    ScoreType, DEFAULT_FEATURES, find_pair_and_features_from_one_feature_name
+    ScoreType, DEFAULT_FEATURES, find_pair_and_features_from_one_feature_name, PAIR_NAMES_AND_FEATURE_NAMES
 };
