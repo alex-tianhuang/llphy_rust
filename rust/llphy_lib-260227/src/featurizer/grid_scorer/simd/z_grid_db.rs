@@ -119,22 +119,14 @@ impl ZGridDBEntry {
     }
 }
 
-/// Shorthand for associating each index of the
-/// array of [`ZGridEntrySum`] with a named field.
-macro_rules! impl_getters {
-    ($([$index:literal, $field:ident]),*) => {
-        impl ZGridEntrySum {
-            $(pub fn $field(&self) -> i64 {
-                self.0.as_array()[$index]
-            })*
-        }
-    };
-}
-impl_getters!([2, weight_total]);
 impl ZGridEntrySum {
     /// Get a new [`ZGridEntrySum`] with all zeroes.
     pub fn new_zeroed() -> Self {
         Self(i64x4::splat(0))
+    }
+    /// The sum of total weights of all entries observed.
+    fn weight_total(&self) -> i64 {
+        self.0[2]
     }
     /// After adding many [`ZGridDBEntry`]s to this sum,
     /// report the sum of weights `A` and `B` divided by
