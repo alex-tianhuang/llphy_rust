@@ -175,7 +175,6 @@ macro_rules! derive_borsh_se_into {
     ($my_ty:ty as $std_ty:ty, |$this:ident| $to_impl:expr) => {
         impl borsh::BorshSerialize for $my_ty {
             fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-                use borsh::BorshSerialize as _;
                 let $this = self;
                 ($to_impl).serialize(writer)
             }
