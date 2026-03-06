@@ -43,14 +43,6 @@ pub struct ZGridEntrySum {
     weight_total: i64,
 }
 impl<'a> ZGridSubtable<'a> {
-    /// Make a new [`ZGridSubtable`] with no content.
-    pub const fn placeholder() -> Self {
-        Self {
-            dbl_z_offsets: [f64::NAN; 2],
-            row_len: 0,
-            data: &[],
-        }
-    }
     /// Make a new [`ZGridSubtable`] with the given data.
     pub fn new(dbl_z_offsets: [f64; 2], row_len: usize, data: &'a [Option<ZGridDBEntry>]) -> Self {
         Self {
