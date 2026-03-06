@@ -1,8 +1,9 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 use crate::{
-    datatypes::{AAIndex, AAMap, MAX_XMER},
-    leak_vec,
+    datatypes::{AAIndex, AAMap, MAX_XMER}, featurizer::grid_scorer::z_grid_db::deserialize_z_grid_db, leak_vec
 };
+use anyhow::Error;
+use borsh::BorshSerialize;
 use bumpalo::{Bump, collections::Vec};
 use std::cmp;
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
@@ -13,6 +14,7 @@ mod z_grid_db;
 mod pair_freq_db;
 pub use pair_freq_db::PairFreqDB;
 pub use z_grid_db::ZGridDB;
+use borsh::BorshDeserialize;
 #[cfg(feature = "simd")]
 mod simd;
 #[cfg(feature = "simd")]
@@ -97,7 +99,22 @@ impl GridScorer<'_> {
         }
     }
 }
-
+/// Moral equivalent of implementing deserialization on [`GridScorer`],
+/// but with a memory arena to put dynamically allocated subtables into.
+pub fn deserialize_grid_scorer<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<GridScorer<'a>, Error> {
+    let pair_freqs = <PairFreqDB>::deserialize(buf)?;
+    let avg_sdevs = <AvgSdevDB>::deserialize(buf)?;
+    let z_grid = deserialize_z_grid_db(buf, arena)?;
+    Ok(GridScorer { pair_freqs, avg_sdevs, z_grid })
+}
+impl BorshSerialize for GridScorer<'_> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.pair_freqs.serialize(writer)?;
+        self.avg_sdevs.serialize(writer)?;
+        self.z_grid.serialize(writer)?;
+        Ok(())
+    }
+}
 /// Try and get a subsequence centered at the given `center` index,
 /// starting with spans of `MAX_XMER` at shrinking until it fits
 /// inside the sequence.

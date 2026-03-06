@@ -1,12 +1,18 @@
 //! Module defining common implementation details
 //! for [`ZGridDB`], a struct used to query
 //! for values in a grid of z-scores.
-//! 
+//!
 //! Separated from simd/non-simd specific implementations.
 
 use std::ops::{Deref, DerefMut};
+use anyhow::Error;
+use borsh::BorshSerialize;
+use bumpalo::Bump;
 
-use crate::{datatypes::AAMap, featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable}};
+use crate::{
+    datatypes::AAMap,
+    featurizer::grid_scorer::{XmerIndexableArray, ZGridSubtable, no_simd::deserialize_subtable},
+};
 
 /// A struct of tables indexable by `(aa, xmer)` keys,
 /// where each subtable is 2D `zscore`-indexable.
@@ -33,20 +39,50 @@ impl<'a> ZGridDB<'a> {
     }
 }
 
+/// Moral equivalent of implementing deserialization on [`ZGridDB`],
+/// but with a memory arena to put dynamically allocated subtables into.
+pub fn deserialize_z_grid_db<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<ZGridDB<'a>, Error> {
+    let mut arr = [const { None }; 20];
+    for slot in arr.iter_mut() {
+        let mut arr = [const { None }; _];
+        for slot in arr.iter_mut() {
+            let subtable = deserialize_subtable(buf, arena)?;
+            *slot = Some(subtable)
+        }
+        *slot = Some(XmerIndexableArray::new(arr.map(Option::unwrap)))
+    }
+    Ok(ZGridDB(AAMap(arr.map(Option::unwrap))))
+}
+impl BorshSerialize for ZGridDB<'_> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        for arr in self.values() {
+            for subtable in arr {
+                subtable.serialize(writer)?;
+            }
+        }
+        Ok(())
+    }
+}
 /// Find the gridpoint that minimizes the
 /// sum of squared differences to the given zscores.
-/// 
+///
 /// Helper function for [`ZGridSubtable::lookup`].
-/// 
+///
 /// Arguments
 /// ---------
 /// - `data` is a `row_len x column_len` grid of entries of type `T`,
-///   which may or may not be occupied with data 
+///   which may or may not be occupied with data
 /// - `to_occupied` attempts to convert `T` into an occupied entry
 ///   of type `U`
 /// - `coord_a` and `coord_b` are the two coordinates for which
 ///   we are trying to find an entry with the minimum distance to.
-pub fn lookup_thorough<T, U>(data: &[T], row_len: usize, to_occupied: fn(&T) -> Option<&U>, coord_a: f64, coord_b: f64) -> &U {
+pub fn lookup_thorough<T, U>(
+    data: &[T],
+    row_len: usize,
+    to_occupied: fn(&T) -> Option<&U>,
+    coord_a: f64,
+    coord_b: f64,
+) -> &U {
     let column_len = data.len() / row_len;
     let mut best_entry: Option<(f64, &U)> = None;
     let start_index_a = (coord_a as usize + 1).min(column_len);
@@ -57,8 +93,7 @@ pub fn lookup_thorough<T, U>(data: &[T], row_len: usize, to_occupied: fn(&T) -> 
     };
     let next_search_down =
         { |idx: usize| idx.checked_sub(1).map(|idx| (idx, to_sqr_delta_a(idx))) };
-    let next_search_up =
-        |idx: usize| (idx < column_len).then(|| (idx, to_sqr_delta_a(idx)));
+    let next_search_up = |idx: usize| (idx < column_len).then(|| (idx, to_sqr_delta_a(idx)));
     let mut down_search = next_search_down(start_index_a);
     let mut up_search = next_search_up(start_index_a);
     for _ in 0..column_len {
