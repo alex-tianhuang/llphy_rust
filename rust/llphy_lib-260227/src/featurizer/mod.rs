@@ -13,9 +13,7 @@
 use crate::{
     datatypes::{
         Aminoacid, FastaEntry, FeatureMatrix, find_pair_and_features_from_one_feature_name,
-    },
-    load_pkg_data::load_grid_scorer,
-    pbar::pbar,
+    }, load_pkg_data::load_grid_scorer, pbar::pbar
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
