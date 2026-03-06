@@ -101,8 +101,8 @@ impl<'a> GridScorer<'a> {
     /// Dev note
     /// --------
     /// Memory arena is for:
-    /// i) `GridScorer` is 1MB (huge) and causes segfaults if I put it on the stack.
-    /// ii) `ZGridDB` has a dynamically allocated size but don't want to de-allocate many times.
+    /// 1. `GridScorer` is 1MB (huge) and causes segfaults if I put it on the stack.
+    /// 2. `ZGridDB` has a dynamically allocated size but don't want to use global allocator for that
     pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<&'a Self, Error> {
         let grid_scorer = arena.alloc_with(<MaybeUninit<GridScorer>>::uninit);
         let target = grid_scorer.as_mut_ptr();
