@@ -281,6 +281,18 @@ checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
 [[package]]
 name = "llphyscore"
 version = "0.1.0"
+
+[[package]]
+name = "llphyscore_buildpd"
+version = "0.1.0"
+
+[[package]]
+name = "llphyscore_core"
+version = "0.1.0"
+
+[[package]]
+name = "llphyscore_dev"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "borsh",
@@ -294,6 +306,10 @@ dependencies = [
  "serde-pickle",
  "thiserror",
 ]
+
+[[package]]
+name = "llphyscore_pylib"
+version = "0.1.0"
 
 [[package]]
 name = "memchr"
