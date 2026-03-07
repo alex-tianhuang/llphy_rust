@@ -97,7 +97,7 @@ impl<'a> GridScorer<'a> {
     }
     /// Moral equivalent of implementing deserialization on [`GridScorer`],
     /// but does it in a memory arena and returns a reference to it.
-    /// 
+    ///
     /// Dev note
     /// --------
     /// Memory arena is for:
