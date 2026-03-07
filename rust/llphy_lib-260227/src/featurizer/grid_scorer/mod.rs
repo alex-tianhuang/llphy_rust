@@ -6,7 +6,7 @@ use crate::{
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::{Bump, collections::Vec};
-use std::{cmp, mem::MaybeUninit, ptr::addr_of_mut};
+use std::{cmp, mem::{self, MaybeUninit}, ptr::addr_of_mut};
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
 mod avg_sdev_db;
 pub use avg_sdev_db::AvgSdevDB;
@@ -57,6 +57,13 @@ impl<'a> GridScorer<'a> {
         for &aa in &sequence[1..=n_sites] {
             trimmed_residue_counts[aa] += 1;
         }
+        let mut residue_indexes = AAMap(std::array::from_fn(|aaindex| {
+            let cap = trimmed_residue_counts.0[aaindex];
+            Vec::with_capacity_in(cap, arena)
+        }));
+        for (i, &aa) in sequence[1..=n_sites].iter().enumerate() {
+            residue_indexes[aa].push(i + 1);
+        }
         let mut feature_a_scores = AAMap(std::array::from_fn(|aaindex| {
             let cap = trimmed_residue_counts.0[aaindex];
             Vec::with_capacity_in(cap, arena)
@@ -65,30 +72,33 @@ impl<'a> GridScorer<'a> {
             let cap = trimmed_residue_counts.0[aaindex];
             Vec::with_capacity_in(cap, arena)
         }));
-        for i in 1..=n_sites {
-            let aa = sequence[i];
-            let subseq = get_subseq_centered_at(sequence, i);
-            debug_assert!(subseq.len() >= 3);
-            debug_assert!(subseq.len() % 2 == 1);
-            let mut outer_accumulator = ZGridEntrySum::new_zeroed();
-            let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
-            let relative_midpoint = subseq.len() / 2;
-            let num_windows = cmp::min(relative_midpoint, MAX_XMER);
-            for j in 0..num_windows {
-                let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
-                let n_term_position = relative_midpoint - xmer.get();
-                inner_accumulator +=
-                    &self.pair_freqs[aa][j].n_terminal_mapping[subseq[n_term_position]];
-                let c_term_position = relative_midpoint + xmer.get();
-                inner_accumulator +=
-                    &self.pair_freqs[aa][j].c_terminal_mapping[subseq[c_term_position]];
-                let freqs = inner_accumulator.as_frequencies();
-                let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
-                outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
+        for (aaindex, sites) in residue_indexes.0.into_iter().enumerate() {
+            let aa = AAIndex::from_byte(aaindex as u8).unwrap();
+            for &i in sites.iter() {
+                let subseq = get_subseq_centered_at(sequence, i);
+                debug_assert!(subseq.len() >= 3);
+                debug_assert!(subseq.len() % 2 == 1);
+                let mut outer_accumulator = ZGridEntrySum::new_zeroed();
+                let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
+                let relative_midpoint = subseq.len() / 2;
+                let num_windows = cmp::min(relative_midpoint, MAX_XMER);
+                for j in 0..num_windows {
+                    let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
+                    let n_term_position = relative_midpoint - xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa][j].n_terminal_mapping[subseq[n_term_position]];
+                    let c_term_position = relative_midpoint + xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa][j].c_terminal_mapping[subseq[c_term_position]];
+                    let freqs = inner_accumulator.as_frequencies();
+                    let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
+                    outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
+                }
+                let [freq_a, freq_b] = outer_accumulator.as_frequencies();
+                feature_a_scores[aa].push(freq_a);
+                feature_b_scores[aa].push(freq_b);
             }
-            let [freq_a, freq_b] = outer_accumulator.as_frequencies();
-            feature_a_scores[aa].push(freq_a);
-            feature_b_scores[aa].push(freq_b);
+            mem::forget(sites);
         }
         GridScore {
             feature_a_scores: AAMap(feature_a_scores.0.map(|v| leak_vec(v) as &[_])),
