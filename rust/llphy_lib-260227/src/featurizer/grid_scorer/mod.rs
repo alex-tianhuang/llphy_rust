@@ -73,7 +73,7 @@ impl<'a> GridScorer<'a> {
             Vec::with_capacity_in(cap, arena)
         }));
         for (aaindex, sites) in residue_indexes.0.into_iter().enumerate() {
-            let aa = AAIndex::from_byte(aaindex as u8).unwrap();
+            let aa = unsafe {AAIndex::from_byte_unchecked(aaindex as u8)};
             for &i in sites.iter() {
                 let subseq = get_subseq_centered_at(sequence, i);
                 debug_assert!(subseq.len() >= 3);
