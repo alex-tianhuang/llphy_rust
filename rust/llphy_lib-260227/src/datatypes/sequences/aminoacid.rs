@@ -169,7 +169,12 @@ impl AAIndex {
             None
         } else {
             // SAFETY: Is number less than or equal to 19.
-            Some(unsafe { mem::transmute::<u8, Self>(b)})
+            Some(unsafe { Self::from_byte_unchecked(b)} )
         }
+    }
+    /// Make an [`AAIndex`] from a byte without checking if
+    /// it is less than or equal to 19.
+    pub unsafe fn from_byte_unchecked(b: u8) -> Self {
+        unsafe { mem::transmute::<u8, Self>(b)}
     }
 }
