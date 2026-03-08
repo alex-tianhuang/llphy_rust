@@ -55,14 +55,6 @@ pub struct ZGridDBEntry(i64x4);
 /// it does not map to numeric data in [`ZGridDBEntry`].
 pub struct ZGridEntrySum(i64x4);
 impl<'a> ZGridSubtable<'a> {
-    /// Make a new [`ZGridSubtable`] with no content.
-    pub const fn placeholder() -> Self {
-        Self {
-            dbl_z_offsets: f64x2::from_array([f64::NAN; 2]),
-            row_len: 0,
-            data: &[],
-        }
-    }
     /// Make a new [`ZGridSubtable`] with the given data.
     pub fn new(dbl_z_offsets: [f64; 2], row_len: usize, data: &'a [ZGridDBEntry]) -> Self {
         Self {
