@@ -135,11 +135,7 @@ impl<'a> ZGridSubtable<'a> {
             let array_repr = <[i64; 4]>::deserialize(buf)?;
             <Result<_, Error>>::Ok(ZGridDBEntry(i64x4::from_array(array_repr)))
         })?;
-        Ok(ZGridSubtable {
-            dbl_z_offsets: f64x2::from_array(dbl_z_offsets),
-            row_len,
-            data,
-        })
+        Ok(ZGridSubtable::new(dbl_z_offsets, row_len, data))
     }
 }
 impl BorshSerialize for ZGridSubtable<'_> {
