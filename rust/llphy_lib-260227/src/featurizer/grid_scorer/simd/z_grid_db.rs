@@ -109,7 +109,7 @@ impl<'a> ZGridSubtable<'a> {
         let data_len = <usize>::deserialize(buf)?;
         if data_len > KNOWN_MAX_DATA_LEN {
             let cell_size = size_of::<ZGridDBEntry>() as u64;
-            let asked_for = ByteSize::b(cell_size * data_len as u64);
+            let asked_for = ByteSize::b(cell_size.saturating_mul(data_len as u64));
             let expected = ByteSize::b(cell_size * KNOWN_MAX_DATA_LEN as u64);
             return Err(Error::msg(format!(
                 "[ZGridSubtable::deserialize] expected at most {:?} to be allocated, but asking for {:?}",
