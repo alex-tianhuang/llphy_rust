@@ -98,10 +98,10 @@ impl<'a> ZGridSubtable<'a> {
         let [idx_a, idx_b] = indexes.cast::<u64>().to_array();
         let idx_a = idx_a as usize;
         let idx_b = idx_b as usize;
-        let row = self
-            .data
-            .get(self.row_len * idx_a..self.row_len * (idx_a + 1))?;
-        let entry = row.get(idx_b)?;
+        if idx_a * self.row_len >= self.data.len() || idx_b >= self.row_len {
+            return None;
+        }
+        let entry = &self.data[idx_a * self.row_len + idx_b];
         entry.to_occupied()
     }
     /// Find the gridpoint that minimizes the sum of squared
