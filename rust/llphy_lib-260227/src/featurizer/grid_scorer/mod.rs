@@ -64,27 +64,28 @@ impl<'a> GridScorer<'a> {
         for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
             site_indexes[aa_i].push(i + 1);
         }
-        let mut feature_a_scores = AAMap(std::array::from_fn(|aaindex| {
-            let cap = site_counts.0[aaindex];
-            Vec::with_capacity_in(cap, arena)
+        let mut feature_a_scores = AAMap(std::array::from_fn(|_| {
+            &[] as &[f64]
         }));
-        let mut feature_b_scores = AAMap(std::array::from_fn(|aaindex| {
-            let cap = site_counts.0[aaindex];
-            Vec::with_capacity_in(cap, arena)
+        let mut feature_b_scores = AAMap(std::array::from_fn(|_| {
+            &[] as &[f64]
         }));
         for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
             let aa_i = unsafe {AAIndex::from_byte_unchecked(aa_i as u8)};
-            for &i in sites_containing_aa_i.iter() {
-                let wingspan = wingspan_of(i, sequence.len());
+            let n_sites_i = sites_containing_aa_i.len();
+            let feature_a_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            let feature_b_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            for (i, &site) in sites_containing_aa_i.iter().enumerate() {
+                let wingspan = wingspan_of(site, sequence.len());
                 let mut outer_accumulator = ZGridEntrySum::new_zeroed();
                 let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
                 let num_windows = cmp::min(wingspan, MAX_XMER);
                 for j in 0..num_windows {
                     let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
-                    let n_term_position = i - xmer.get();
+                    let n_term_position = site - xmer.get();
                     inner_accumulator +=
                         &self.pair_freqs[aa_i][j].n_terminal_mapping[sequence[n_term_position]];
-                    let c_term_position = i + xmer.get();
+                    let c_term_position = site + xmer.get();
                     inner_accumulator +=
                         &self.pair_freqs[aa_i][j].c_terminal_mapping[sequence[c_term_position]];
                     let freqs = inner_accumulator.as_frequencies();
@@ -92,14 +93,16 @@ impl<'a> GridScorer<'a> {
                     outer_accumulator += self.z_grid[aa_i][xmer].lookup(zscores);
                 }
                 let [freq_a, freq_b] = outer_accumulator.as_frequencies();
-                feature_a_scores[aa_i].push(freq_a);
-                feature_b_scores[aa_i].push(freq_b);
+                feature_a_scores_i[i] = freq_a;
+                feature_b_scores_i[i] = freq_b;
             }
+            feature_a_scores[aa_i] = feature_a_scores_i;
+            feature_b_scores[aa_i] = feature_b_scores_i;
             mem::forget(sites_containing_aa_i);
         }
         GridScore {
-            feature_a_scores: AAMap(feature_a_scores.0.map(|v| leak_vec(v) as &[_])),
-            feature_b_scores: AAMap(feature_b_scores.0.map(|v| leak_vec(v) as &[_])),
+            feature_a_scores,
+            feature_b_scores,
         }
     }
     /// Moral equivalent of implementing deserialization on [`GridScorer`],
