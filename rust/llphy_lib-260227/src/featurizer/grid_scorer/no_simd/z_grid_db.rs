@@ -66,11 +66,8 @@ impl<'a> ZGridSubtable<'a> {
     /// Snap doubled zscores to the grid and
     /// see if an entry exists and is occupied there.
     fn lookup_quick(&self, dbl_zscores: [f64; 2]) -> Option<&ZGridDBEntry> {
-        // Bounds derived from Cai's `make_linekey`
-        // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores.map(|x| x.round().clamp(-16.0, 24.0));
-        let idx_a = clamped_zscores[0] - self.dbl_z_offsets[0];
-        let idx_b = clamped_zscores[1] - self.dbl_z_offsets[1];
+        let idx_a = dbl_zscores[0].round() - self.dbl_z_offsets[0];
+        let idx_b = dbl_zscores[1].round() - self.dbl_z_offsets[1];
         if idx_a < 0.0 || idx_b < 0.0 {
             return None;
         }
@@ -116,11 +113,7 @@ impl<'a> ZGridSubtable<'a> {
                 <Result<_, Error>>::Ok(None)
             }
         })?;
-        Ok(ZGridSubtable {
-            dbl_z_offsets,
-            row_len,
-            data,
-        })
+        Ok(ZGridSubtable::new(dbl_z_offsets, row_len, data))
     }
 }
 impl BorshSerialize for ZGridSubtable<'_> {

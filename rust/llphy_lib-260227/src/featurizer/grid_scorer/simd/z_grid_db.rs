@@ -86,18 +86,11 @@ impl<'a> ZGridSubtable<'a> {
     /// Snap doubled zscores to the grid and
     /// see if an entry exists and is occupied there.
     fn lookup_quick(&self, dbl_zscores: f64x2) -> Option<&ZGridDBEntry> {
-        // Bounds derived from Cai's `make_linekey`
-        // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores
-            .round()
-            .simd_clamp(f64x2::splat(-16.0), f64x2::splat(24.0));
-        let indexes = clamped_zscores - self.dbl_z_offsets;
+        let indexes = dbl_zscores.round() - self.dbl_z_offsets;
         if indexes.simd_lt(f64x2::splat(0.0)).any() {
             return None;
         }
-        let [idx_a, idx_b] = indexes.cast::<u64>().to_array();
-        let idx_a = idx_a as usize;
-        let idx_b = idx_b as usize;
+        let [idx_a, idx_b] = indexes.cast::<usize>().to_array();
         if idx_a * self.row_len >= self.data.len() || idx_b >= self.row_len {
             return None;
         }
