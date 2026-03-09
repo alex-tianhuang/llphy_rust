@@ -6,7 +6,7 @@ use crate::{
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::{Bump, collections::Vec};
-use std::{cmp, mem::MaybeUninit, ptr::addr_of_mut};
+use std::{cmp, mem::{self, MaybeUninit}, ptr::addr_of_mut};
 pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
 mod avg_sdev_db;
 pub use avg_sdev_db::AvgSdevDB;
@@ -53,46 +53,56 @@ impl<'a> GridScorer<'a> {
                 feature_b_scores: AAMap([&[]; 20]),
             };
         };
-        let mut trimmed_residue_counts = AAMap::default();
+        let mut site_counts = AAMap::default();
         for &aa in &sequence[1..=n_sites] {
-            trimmed_residue_counts[aa] += 1;
+            site_counts[aa] += 1;
         }
-        let mut feature_a_scores = AAMap(std::array::from_fn(|aaindex| {
-            let cap = trimmed_residue_counts.0[aaindex];
+        let mut site_indexes = AAMap(std::array::from_fn(|aaindex| {
+            let cap = site_counts.0[aaindex];
             Vec::with_capacity_in(cap, arena)
         }));
-        let mut feature_b_scores = AAMap(std::array::from_fn(|aaindex| {
-            let cap = trimmed_residue_counts.0[aaindex];
-            Vec::with_capacity_in(cap, arena)
+        for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
+            site_indexes[aa_i].push(i + 1);
+        }
+        let mut feature_a_scores = AAMap(std::array::from_fn(|_| {
+            &[] as &[f64]
         }));
-        for i in 1..=n_sites {
-            let aa = sequence[i];
-            let subseq = get_subseq_centered_at(sequence, i);
-            debug_assert!(subseq.len() >= 3);
-            debug_assert!(subseq.len() % 2 == 1);
-            let mut outer_accumulator = ZGridEntrySum::new_zeroed();
-            let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
-            let relative_midpoint = subseq.len() / 2;
-            let num_windows = cmp::min(relative_midpoint, MAX_XMER);
-            for j in 0..num_windows {
-                let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
-                let n_term_position = relative_midpoint - xmer.get();
-                inner_accumulator +=
-                    &self.pair_freqs[aa][j].n_terminal_mapping[subseq[n_term_position]];
-                let c_term_position = relative_midpoint + xmer.get();
-                inner_accumulator +=
-                    &self.pair_freqs[aa][j].c_terminal_mapping[subseq[c_term_position]];
-                let freqs = inner_accumulator.as_frequencies();
-                let zscores = self.avg_sdevs[aa][xmer].freqs_to_zscores(freqs);
-                outer_accumulator += self.z_grid[aa][xmer].lookup(zscores);
+        let mut feature_b_scores = AAMap(std::array::from_fn(|_| {
+            &[] as &[f64]
+        }));
+        for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
+            let aa_i = unsafe {AAIndex::from_byte_unchecked(aa_i as u8)};
+            let n_sites_i = sites_containing_aa_i.len();
+            let feature_a_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            let feature_b_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            for (i, &site) in sites_containing_aa_i.iter().enumerate() {
+                let wingspan = wingspan_of(site, sequence.len());
+                let mut outer_accumulator = ZGridEntrySum::new_zeroed();
+                let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
+                let num_windows = cmp::min(wingspan, MAX_XMER);
+                for j in 0..num_windows {
+                    let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
+                    let n_term_position = site - xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa_i][j].n_terminal_mapping[sequence[n_term_position]];
+                    let c_term_position = site + xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa_i][j].c_terminal_mapping[sequence[c_term_position]];
+                    let freqs = inner_accumulator.as_frequencies();
+                    let zscores = self.avg_sdevs[aa_i][xmer].freqs_to_zscores(freqs);
+                    outer_accumulator += self.z_grid[aa_i][xmer].lookup(zscores);
+                }
+                let [freq_a, freq_b] = outer_accumulator.as_frequencies();
+                feature_a_scores_i[i] = freq_a;
+                feature_b_scores_i[i] = freq_b;
             }
-            let [freq_a, freq_b] = outer_accumulator.as_frequencies();
-            feature_a_scores[aa].push(freq_a);
-            feature_b_scores[aa].push(freq_b);
+            feature_a_scores[aa_i] = feature_a_scores_i;
+            feature_b_scores[aa_i] = feature_b_scores_i;
+            mem::forget(sites_containing_aa_i);
         }
         GridScore {
-            feature_a_scores: AAMap(feature_a_scores.0.map(|v| leak_vec(v) as &[_])),
-            feature_b_scores: AAMap(feature_b_scores.0.map(|v| leak_vec(v) as &[_])),
+            feature_a_scores,
+            feature_b_scores,
         }
     }
     /// Moral equivalent of implementing deserialization on [`GridScorer`],
@@ -133,13 +143,11 @@ impl BorshSerialize for GridScorer<'_> {
         Ok(())
     }
 }
-/// Try and get a subsequence centered at the given `center` index,
-/// starting with spans of `MAX_XMER` at shrinking until it fits
-/// inside the sequence.
-fn get_subseq_centered_at(sequence: &[AAIndex], center: usize) -> &[AAIndex] {
+/// The maximum number `n` such that a residue at
+/// `center` has `n` residues on either side of it
+/// in a sequence of given length.
+fn wingspan_of(center: usize, sequence_len: usize) -> usize {
     let space_on_left = center;
-    let space_on_right = sequence.len() - 1 - center;
-    let min_space = cmp::min(space_on_left, space_on_right);
-    let xmer = cmp::min(min_space, MAX_XMER);
-    &sequence[center - xmer..center + xmer + 1]
+    let space_on_right = sequence_len - 1 - center;
+    cmp::min(space_on_left, space_on_right)
 }

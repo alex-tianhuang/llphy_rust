@@ -66,20 +66,17 @@ impl<'a> ZGridSubtable<'a> {
     /// Snap doubled zscores to the grid and
     /// see if an entry exists and is occupied there.
     fn lookup_quick(&self, dbl_zscores: [f64; 2]) -> Option<&ZGridDBEntry> {
-        // Bounds derived from Cai's `make_linekey`
-        // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores.map(|x| x.round().clamp(-16.0, 24.0));
-        let idx_a = clamped_zscores[0] - self.dbl_z_offsets[0];
-        let idx_b = clamped_zscores[1] - self.dbl_z_offsets[1];
+        let idx_a = dbl_zscores[0].round() - self.dbl_z_offsets[0];
+        let idx_b = dbl_zscores[1].round() - self.dbl_z_offsets[1];
         if idx_a < 0.0 || idx_b < 0.0 {
             return None;
         }
         let idx_a = idx_a as usize;
         let idx_b = idx_b as usize;
-        let row = self
-            .data
-            .get(self.row_len * idx_a..self.row_len * (idx_a + 1))?;
-        let entry = row.get(idx_b)?;
+        if idx_a * self.row_len >= self.data.len() || idx_b >= self.row_len {
+            return None;
+        }
+        let entry = &self.data[idx_a * self.row_len + idx_b];
         entry.as_ref()
     }
     /// Find the gridpoint that minimizes the sum of squared
@@ -97,7 +94,7 @@ impl<'a> ZGridSubtable<'a> {
         let data_len = <usize>::deserialize(buf)?;
         if data_len > KNOWN_MAX_DATA_LEN {
             let cell_size = size_of::<Option<ZGridDBEntry>>() as u64;
-            let asked_for = ByteSize::b(cell_size * data_len as u64);
+            let asked_for = ByteSize::b(cell_size.saturating_mul(data_len as u64));
             let expected = ByteSize::b(cell_size * KNOWN_MAX_DATA_LEN as u64);
             return Err(Error::msg(format!(
                 "[ZGridSubtable::deserialize] expected at most {:?} to be allocated, but asking for {:?}",
@@ -116,11 +113,7 @@ impl<'a> ZGridSubtable<'a> {
                 <Result<_, Error>>::Ok(None)
             }
         })?;
-        Ok(ZGridSubtable {
-            dbl_z_offsets,
-            row_len,
-            data,
-        })
+        Ok(ZGridSubtable::new(dbl_z_offsets, row_len, data))
     }
 }
 impl BorshSerialize for ZGridSubtable<'_> {

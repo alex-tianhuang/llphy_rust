@@ -55,14 +55,6 @@ pub struct ZGridDBEntry(i64x4);
 /// it does not map to numeric data in [`ZGridDBEntry`].
 pub struct ZGridEntrySum(i64x4);
 impl<'a> ZGridSubtable<'a> {
-    /// Make a new [`ZGridSubtable`] with no content.
-    pub const fn placeholder() -> Self {
-        Self {
-            dbl_z_offsets: f64x2::from_array([f64::NAN; 2]),
-            row_len: 0,
-            data: &[],
-        }
-    }
     /// Make a new [`ZGridSubtable`] with the given data.
     pub fn new(dbl_z_offsets: [f64; 2], row_len: usize, data: &'a [ZGridDBEntry]) -> Self {
         Self {
@@ -86,22 +78,15 @@ impl<'a> ZGridSubtable<'a> {
     /// Snap doubled zscores to the grid and
     /// see if an entry exists and is occupied there.
     fn lookup_quick(&self, dbl_zscores: f64x2) -> Option<&ZGridDBEntry> {
-        // Bounds derived from Cai's `make_linekey`
-        // function from the original `LLPhyScore`.
-        let clamped_zscores = dbl_zscores
-            .round()
-            .simd_clamp(f64x2::splat(-16.0), f64x2::splat(24.0));
-        let indexes = clamped_zscores - self.dbl_z_offsets;
+        let indexes = dbl_zscores.round() - self.dbl_z_offsets;
         if indexes.simd_lt(f64x2::splat(0.0)).any() {
             return None;
         }
-        let [idx_a, idx_b] = indexes.cast::<u64>().to_array();
-        let idx_a = idx_a as usize;
-        let idx_b = idx_b as usize;
-        let row = self
-            .data
-            .get(self.row_len * idx_a..self.row_len * (idx_a + 1))?;
-        let entry = row.get(idx_b)?;
+        let [idx_a, idx_b] = indexes.cast::<usize>().to_array();
+        if idx_a * self.row_len >= self.data.len() || idx_b >= self.row_len {
+            return None;
+        }
+        let entry = &self.data[idx_a * self.row_len + idx_b];
         entry.to_occupied()
     }
     /// Find the gridpoint that minimizes the sum of squared
@@ -124,7 +109,7 @@ impl<'a> ZGridSubtable<'a> {
         let data_len = <usize>::deserialize(buf)?;
         if data_len > KNOWN_MAX_DATA_LEN {
             let cell_size = size_of::<ZGridDBEntry>() as u64;
-            let asked_for = ByteSize::b(cell_size * data_len as u64);
+            let asked_for = ByteSize::b(cell_size.saturating_mul(data_len as u64));
             let expected = ByteSize::b(cell_size * KNOWN_MAX_DATA_LEN as u64);
             return Err(Error::msg(format!(
                 "[ZGridSubtable::deserialize] expected at most {:?} to be allocated, but asking for {:?}",
@@ -135,11 +120,7 @@ impl<'a> ZGridSubtable<'a> {
             let array_repr = <[i64; 4]>::deserialize(buf)?;
             <Result<_, Error>>::Ok(ZGridDBEntry(i64x4::from_array(array_repr)))
         })?;
-        Ok(ZGridSubtable {
-            dbl_z_offsets: f64x2::from_array(dbl_z_offsets),
-            row_len,
-            data,
-        })
+        Ok(ZGridSubtable::new(dbl_z_offsets, row_len, data))
     }
 }
 impl BorshSerialize for ZGridSubtable<'_> {

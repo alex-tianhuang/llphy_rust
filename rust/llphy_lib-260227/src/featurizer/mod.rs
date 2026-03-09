@@ -70,10 +70,7 @@ pub fn featurize<'a, const QUIET: bool>(
                 / size_of::<&str>();
             Some(idx)
         });
-        // `GridScorer` is a 1MiB struct.
-        // This is me trying my best not to put it on the stack.
-        let grid_scorer = per_feature_pair_arena
-            .alloc_try_with(|| load_grid_scorer(pair_name, &per_feature_pair_arena))?;
+        let grid_scorer = load_grid_scorer(pair_name, &per_feature_pair_arena)?;
         if !QUIET {
             let pbar = pbar(sequences.len() as u64);
             pbar.println(bumpalo::format!(in &per_feature_pair_arena, "COMPUTING FEATURE PAIR {}", pair_name));
