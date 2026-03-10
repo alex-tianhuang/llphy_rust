@@ -3,11 +3,9 @@
 mod aamap;
 mod aastring;
 mod aminoacid;
-pub use aamap::{
-    AAMap,
-};
-pub(crate) use aastring::aa_canonical_str;
-pub(crate) use aminoacid::{AMINOACIDS, Aminoacid, AAIndex};
+pub use aamap::AAMap;
+pub use aastring::aa_canonical_str;
+pub use aminoacid::{AAIndex, AMINOACIDS, Aminoacid};
 
 /// Fasta entry, containing a sequence and header.
 pub struct FastaEntry<'a> {

@@ -1,8 +1,6 @@
 //! Module defining the [`AAMap`] type.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-// use serde::{Deserialize, de::Visitor};
-
 use crate::datatypes::{AAIndex, AMINOACIDS, Aminoacid};
 use std::{
     fmt::Debug,
@@ -111,30 +109,3 @@ impl<T: Debug> Debug for AAMap<T> {
         f.debug_map().entries(self.iter()).finish()
     }
 }
-// impl<'de, T: Deserialize<'de> + Default> Deserialize<'de> for AAMap<T> {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         struct AAMapVisitor<T>(PhantomData<T>);
-//         impl<'de, T: Deserialize<'de> + Default> Visitor<'de> for AAMapVisitor<T> {
-//             type Value = AAMap<T>;
-//             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//                 write!(formatter, "a map with amino acids as keys")
-//             }
-//             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-//             where
-//                 A: serde::de::MapAccess<'de>,
-//             {
-//                 let mut aamap = AAMap::default();
-//                 while let Some((ch, value)) = map.next_entry()? {
-//                     let ch: char = ch;
-//                     let aa = Aminoacid::try_from(ch).map_err(serde::de::Error::custom)?;
-//                     aamap[aa] = value
-//                 }
-//                 Ok(aamap)
-//             }
-//         }
-//         deserializer.deserialize_map(AAMapVisitor(PhantomData))
-//     }
-// }

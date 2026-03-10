@@ -1,10 +1,8 @@
 //! Module defining a generic borrowed aminoacid string, [`aa_str`].
 use crate::datatypes::sequences::aastring::generic::AALike;
 use std::{
-    // marker::PhantomData,
     ops::{Index, Range, RangeFrom, RangeInclusive, RangeTo},
 };
-// use thiserror::Error;
 /// Borrowed string datatype generic over [`AALike`] datatypes,
 /// which I refer to in the docs using the generic type `A`.
 ///
@@ -80,16 +78,4 @@ impl<'a, A: AALike> IntoIterator for &'a aa_str<A> {
         self.0.iter().copied()
     }
 }
-
-// /// Error returned when converting bytes to an [`aa_str`].
-// #[derive(Debug, Error)]
-// #[error("expected string of {}s, but found `{ch}` at index {at}", A::DESCRIBE)]
-// pub struct NotAAStrError<A: AALike> {
-//     /// Index at which an invalid character was found.
-//     pub at: usize,
-//     /// Character that is not an aminoacid.
-//     pub ch: char,
-//     /// Type used to vary the error message string.
-//     __phantom: PhantomData<A>,
-// }
 
