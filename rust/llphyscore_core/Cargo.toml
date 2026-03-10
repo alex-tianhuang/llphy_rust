@@ -7,3 +7,7 @@ edition = "2024"
 anyhow = "1.0.102"
 borsh = { version = "1.6.0", features = ["derive"] }
 bumpalo = { version = "3.20.2", features = ["collections"] }
+clap = { version = "4.5.60", features = ["derive"] }
+
+[features]
+simd = []

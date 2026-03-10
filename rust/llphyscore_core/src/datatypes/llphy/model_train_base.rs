@@ -1,8 +1,6 @@
 //! Module defining the [`ModelTrainingBase`] enum.
 use std::fmt::Display;
-use anyhow::Error;
 use clap::ValueEnum;
-use pyo3::{PyErr, FromPyObject};
 /// Whether the phase separation model was trained on a negative
 /// dataset consisting of the human proteome, the PDB, or both.
 #[derive(Copy, Clone, ValueEnum)]
@@ -16,13 +14,6 @@ pub enum ModelTrainingBase {
     #[value(name = "human+PDB")]
     /// Model was trained on the PDB + human proteome negative dataset.
     HumanPDB,
-}
-impl<'a, 'py> FromPyObject<'a, 'py> for ModelTrainingBase {
-    type Error = PyErr;
-    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
-        let s = obj.extract()?;
-        Ok(ModelTrainingBase::from_str(s, false).map_err(Error::msg)?)
-    }
 }
 impl Display for ModelTrainingBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
