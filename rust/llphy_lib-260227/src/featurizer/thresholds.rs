@@ -51,7 +51,7 @@ impl Thresholds {
 }
 impl ThresholdPair {
     /// Get an integer value from a single grid score.
-    fn score_site(&self, grid_score: f64) -> i64 {
+    pub fn score_site(&self, grid_score: f64) -> i64 {
         let Self { lower, upper } = *self;
         (grid_score > upper) as i64 - (grid_score < lower) as i64
     }
