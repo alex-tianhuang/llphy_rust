@@ -1,7 +1,7 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 //!
 //! Structs that turn a sequence into a residue-level feature grids.
-use crate::datatypes::AAMap;
+use crate::datatypes::{AAIndex, AAMap, MAX_XMER, llphy::grid_scorer::xmer::XmerSize};
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::Bump;
@@ -12,6 +12,7 @@ pub use avg_sdev_db::AvgSdevDB;
 mod pair_freq_db;
 mod xmer;
 mod z_grid_db;
+use bumpalo::collections::Vec;
 pub use pair_freq_db::PairFreqDB;
 pub use z_grid_db::ZGridDB;
 #[cfg(feature = "simd")]
@@ -27,7 +28,7 @@ pub use no_simd::{
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)
 /// from sequences.
-/// 
+///
 /// Dev note
 /// --------
 /// The computation logic is in the [`crate::featurizer`] module.
@@ -73,5 +74,71 @@ impl<'a> GridScorer<'a> {
         // SAFETY: just initialized all fields above
         Ok(unsafe { grid_scorer.assume_init_ref() })
     }
+    /// Turn a sequence into a biophysical feature grid (currently [`GridScore`])
+    /// by looking at the average value of some given biophysical feature on windows
+    /// centered on each residue type.
+    pub fn score_sequence<'b>(&self, sequence: &[AAIndex], arena: &'b Bump) -> GridScore<'b> {
+        let Some(n_sites) = sequence.len().checked_sub(2) else {
+            return GridScore {
+                feature_a_scores: AAMap([&[]; 20]),
+                feature_b_scores: AAMap([&[]; 20]),
+            };
+        };
+        let mut site_counts = AAMap::default();
+        for &aa in &sequence[1..=n_sites] {
+            site_counts[aa] += 1;
+        }
+        let mut site_indexes = AAMap(std::array::from_fn(|aaindex| {
+            let cap = site_counts.0[aaindex];
+            Vec::with_capacity_in(cap, arena)
+        }));
+        for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
+            site_indexes[aa_i].push(i + 1);
+        }
+        let mut feature_a_scores = AAMap(std::array::from_fn(|_| &[] as &[f64]));
+        let mut feature_b_scores = AAMap(std::array::from_fn(|_| &[] as &[f64]));
+        for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
+            let aa_i = unsafe { AAIndex::from_byte_unchecked(aa_i as u8) };
+            let n_sites_i = sites_containing_aa_i.len();
+            let feature_a_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            let feature_b_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
+            for (i, &site) in sites_containing_aa_i.iter().enumerate() {
+                let wingspan = wingspan_of(site, sequence.len());
+                let mut outer_accumulator = ZGridEntrySum::new_zeroed();
+                let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
+                let num_windows = std::cmp::min(wingspan, MAX_XMER);
+                for j in 0..num_windows {
+                    let xmer = unsafe { XmerSize::new_unchecked(j + 1) };
+                    let n_term_position = site - xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa_i][j].n_terminal_mapping[sequence[n_term_position]];
+                    let c_term_position = site + xmer.get();
+                    inner_accumulator +=
+                        &self.pair_freqs[aa_i][j].c_terminal_mapping[sequence[c_term_position]];
+                    let freqs = inner_accumulator.as_frequencies();
+                    let zscores = self.avg_sdevs[aa_i][xmer].freqs_to_zscores(freqs);
+                    outer_accumulator += self.z_grid[aa_i][xmer].lookup(zscores);
+                }
+                let [freq_a, freq_b] = outer_accumulator.as_frequencies();
+                feature_a_scores_i[i] = freq_a;
+                feature_b_scores_i[i] = freq_b;
+            }
+            feature_a_scores[aa_i] = feature_a_scores_i;
+            feature_b_scores[aa_i] = feature_b_scores_i;
+            std::mem::forget(sites_containing_aa_i);
+        }
+        GridScore {
+            feature_a_scores,
+            feature_b_scores,
+        }
+    }
 }
 
+/// The maximum number `n` such that a residue at
+/// `center` has `n` residues on either side of it
+/// in a sequence of given length.
+fn wingspan_of(center: usize, sequence_len: usize) -> usize {
+    let space_on_left = center;
+    let space_on_right = sequence_len - 1 - center;
+    std::cmp::min(space_on_left, space_on_right)
+}
