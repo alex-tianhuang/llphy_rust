@@ -1,14 +1,10 @@
 //! Module defining the [`Aminoacid`] enum.
 use anyhow::Error;
-// use pyo3::{
-//     FromPyObject, PyErr,
-//     exceptions::PyValueError,
-//     types::{PyAnyMethods, PyString, PyStringMethods},
-// };
-use std::{mem};
+use std::mem;
 
 /// Macro that defines the [`Aminoacid`] enum
-/// and reduces some of the boilerplate.
+/// and reduces some of the boilerplate of typing
+/// out `Aminoacid::A`, `Aminoacid::C`, etc...
 macro_rules! define_aminoacids {
     ($($(#[$($variant_attrs:tt)*])* $variant:ident = $b:expr),+) => {
         /// Standard 20 aminoacids.
@@ -39,6 +35,8 @@ macro_rules! define_aminoacids {
         pub const AMINOACIDS: [Aminoacid; 20] = [$(Aminoacid::$variant),+];
         /// For each variant of [`Aminoacid`], the corresponding
         /// index (as `u8`) at which it appears in [`AMINOACIDS`].
+        /// 
+        /// Represented by a `u8` that is less than `19`.
         #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
         #[repr(u8)]
         pub enum AAIndex {
@@ -111,32 +109,6 @@ impl From<Aminoacid> for u8 {
         value as u8
     }
 }
-// impl<'a, 'py> FromPyObject<'a, 'py> for Aminoacid {
-//     type Error = PyErr;
-//     fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
-//         let s = obj.cast::<PyString>()?;
-//         if s.len()? != 1 {
-//             return Err(PyValueError::new_err("expected a string of length 1"));
-//         }
-//         match s.to_cow()? {
-//             Cow::Borrowed(s) => {
-//                 let [b] = *s.as_bytes() else {
-//                     return Err(PyValueError::new_err(format!(
-//                         "expected aminoacid, got unknown string: {}",
-//                         s
-//                     )))
-//                 };
-//                 Ok(Aminoacid::try_from(b).map_err(Error::new)?)
-//             }
-//             Cow::Owned(s) => Err(PyValueError::new_err(format!(
-//                 "expected aminoacid, got unknown string: {}",
-//                 s
-//             ))),
-//         }
-//     }
-// }
-/// Error returned when converting a byte to an [`Aminoacid`].
-
 impl AAIndex {
     /// Lowest index (0).
     pub const MIN: Self = AAIndex::A;
