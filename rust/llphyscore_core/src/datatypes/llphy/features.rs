@@ -163,8 +163,6 @@ impl PostProcessedFeatureMatrix<'_> {
     }
 }
 impl<'a> PostProcessedFeatureVector<'a> {
-    /// Utility method for the [`crate::output`] module.
-    ///
     /// Write the values in this vector into a big comma separated list.
     pub fn format_comma_separated_into(&self, fmt: &mut String<'_>) {
         match *self {
