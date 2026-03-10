@@ -163,7 +163,7 @@ impl ZGridEntrySum {
     /// report the sum of weights `A` and `B` divided by
     /// the total weight of all observations taken.
     ///
-    /// Utility method for [`crate::featurizer::score_sequence`].
+    /// Utility method for [`crate::datatypes::GridScorer::score_sequence`].
     pub fn as_frequencies(&self) -> [f64; 2] {
         if self.weight_total() == 0 {
             [0.0; 2]

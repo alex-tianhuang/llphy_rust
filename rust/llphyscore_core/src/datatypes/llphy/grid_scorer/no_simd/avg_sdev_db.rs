@@ -43,7 +43,7 @@ impl AvgSdevDBEntry {
         self.avg_b = avg;
         self.invstd_b = inv_std;
     }
-    /// Helper method for [`crate::featurizer::score_sequence`].
+    /// Helper method for [`crate::datatypes::GridScorer::score_sequence`].
     ///
     /// Equivalent to:
     /// ```

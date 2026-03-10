@@ -61,7 +61,7 @@ impl PairFreqEntrySum {
             total_b: 0.0,
         }
     }
-    /// Helper method for [`crate::featurizer::score_sequence`].
+    /// Helper method for [`crate::datatypes::GridScorer::score_sequence`].
     ///
     /// Equivalent to:
     /// ```
