@@ -16,6 +16,17 @@ pub struct GridDecoder {
     pub sign: i8,
     pub thresholds: Thresholds,
 }
+impl GridDecoder {
+    /// Compute the sequence level feature
+    /// from the given grid scores.
+    pub fn decode(&self, grid_score: &AAMap<&[f64]>) -> i64 {
+        let mut score = 0;
+        for (t, &subarr) in self.thresholds.values().zip(grid_score.values()) {
+            score += t.score_sites(subarr)
+        }
+        score * self.sign as i64
+    }
+}
 /// A collection of [`ThresholdPair`]s for each aminoacid.
 #[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct Thresholds(AAMap<ThresholdPair>);

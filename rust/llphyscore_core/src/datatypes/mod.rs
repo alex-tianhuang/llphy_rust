@@ -1,5 +1,6 @@
-//! Module of datatypes, their serialization/deserialization methods,
-//! and some basic computations/conversions that can be performed on them.
+//! Module of datatypes and associated serialization/deserialization types.
+//! 
+//! Also contains computation logic for [`GridScorer::score_sequence`] and [`GridDecoder::decode`].
 //! 
 //! [`sequences`] for sequence-related datatypes.
 //! [`llphy`] for LLPhyScore-specific datatypes.
