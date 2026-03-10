@@ -96,37 +96,14 @@ pub fn lookup_thorough<T, U>(
 ) -> &U {
     let column_len = data.len() / row_len;
     let mut best_entry: Option<(f64, &U)> = None;
-    let start_index_a = (coord_a as usize + 1).min(column_len);
-    // I assume this gets optimized out
-    let to_sqr_delta_a = |x: usize| {
-        let delta_a = x as f64 - coord_a;
-        delta_a * delta_a
-    };
-    let next_search_down =
-        { |idx: usize| idx.checked_sub(1).map(|idx| (idx, to_sqr_delta_a(idx))) };
-    let next_search_up = |idx: usize| (idx < column_len).then(|| (idx, to_sqr_delta_a(idx)));
-    let mut down_search = next_search_down(start_index_a);
-    let mut up_search = next_search_up(start_index_a);
+    let mut down_idx_a = (coord_a as usize + 1).min(column_len);
+    let mut up_idx_a = down_idx_a;
+    let mut search_up = coord_a.round() as usize >= up_idx_a && up_idx_a < column_len;
     for _ in 0..column_len {
-        let (idx_a, sqr_delta_a) = match (down_search, up_search) {
-            (Some((down_ptr, down_sqr_delta_a)), Some((up_ptr, up_sqr_delta_a))) => {
-                if down_sqr_delta_a < up_sqr_delta_a {
-                    down_search = next_search_down(down_ptr);
-                    (down_ptr, down_sqr_delta_a)
-                } else {
-                    up_search = next_search_up(up_ptr + 1);
-                    (up_ptr, up_sqr_delta_a)
-                }
-            }
-            (None, Some((up_ptr, up_sqr_delta_a))) => {
-                up_search = next_search_up(up_ptr + 1);
-                (up_ptr, up_sqr_delta_a)
-            }
-            (Some((down_ptr, down_sqr_delta_a)), None) => {
-                down_search = next_search_down(down_ptr);
-                (down_ptr, down_sqr_delta_a)
-            }
-            (None, None) => unreachable!(),
+        let idx_a = if search_up { up_idx_a } else { down_idx_a - 1 };
+        let sqr_delta_a = {
+            let delta_a = idx_a as f64 - coord_a;
+            delta_a * delta_a
         };
         if let Some((best_sqr_delta, entry)) = best_entry {
             if best_sqr_delta <= sqr_delta_a {
@@ -151,54 +128,25 @@ pub fn lookup_thorough<T, U>(
                 best_entry = Some((sqr_delta, to_occupied(&row[idx_b]).unwrap()))
             }
         };
-        // I assume this gets optimized out
-        let to_abs_delta_b = |x: usize| {
-            let delta_b = x as f64 - coord_b;
-            delta_b.abs()
-        };
-        let next_search_down =
-            |idx: usize| idx.checked_sub(1).map(|idx| (idx, to_abs_delta_b(idx)));
-        let next_search_up = |idx: usize| (idx < row.len()).then(|| (idx, to_abs_delta_b(idx)));
-        let start_index_b = (coord_b as usize + 1).min(row_len);
-        let mut down_search = next_search_down(start_index_b);
-        let mut up_search = next_search_up(start_index_b);
-        loop {
-            match (down_search, up_search) {
-                (Some((down_ptr, down_abs_delta_b)), Some((up_ptr, up_abs_delta_b))) => {
-                    if down_abs_delta_b < up_abs_delta_b {
-                        down_search = next_search_down(down_ptr);
-                        if idx_is_occupied(down_ptr) {
-                            check_idx_b(down_ptr);
-                            down_search = None
-                        }
-                    } else {
-                        up_search = next_search_up(up_ptr + 1);
-                        if idx_is_occupied(up_ptr) {
-                            check_idx_b(up_ptr);
-                            up_search = None
-                        }
-                    }
-                    continue;
-                }
-                (None, Some((up_ptr, _))) => {
-                    for idx_b in up_ptr..row.len() {
-                        if idx_is_occupied(idx_b) {
-                            check_idx_b(idx_b);
-                            break;
-                        }
-                    }
-                }
-                (Some((down_ptr, _)), None) => {
-                    for idx_b in (0..=down_ptr).rev() {
-                        if idx_is_occupied(idx_b) {
-                            check_idx_b(idx_b);
-                            break;
-                        }
-                    }
-                }
-                (None, None) => (),
-            };
-            break;
+        let breakpoint_b = (coord_b as usize + 1).min(row_len);
+        for idx_b in breakpoint_b..row_len {
+            if idx_is_occupied(idx_b) {
+                check_idx_b(idx_b);
+                break;
+            }
+        }
+        for idx_b in (0..breakpoint_b).rev() {
+            if idx_is_occupied(idx_b) {
+                check_idx_b(idx_b);
+                break;
+            }
+        }
+        if search_up {
+            up_idx_a += 1;
+            search_up = down_idx_a == 0;
+        } else {
+            down_idx_a -= 1;
+            search_up = up_idx_a < column_len;
         }
     }
     best_entry.unwrap().1
