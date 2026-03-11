@@ -1,4 +1,5 @@
-//! Some utility functions for the crate.
+//! Some utility functions for the crate
+//! that I couldn't bother organizing.
 
 /// Leak a [`Vec`] managed by an arena into a slice
 /// that lives for as long as the arena does not reset.
@@ -36,4 +37,8 @@ macro_rules! derive_borsh_se_into {
         }
     };
 }
+use {
+    bumpalo::Bump,
+    std::{iter::Cloned, mem::ManuallyDrop},
+};
 pub(crate) use {derive_borsh_de_from, derive_borsh_se_into};
