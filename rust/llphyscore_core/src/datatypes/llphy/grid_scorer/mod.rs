@@ -95,8 +95,8 @@ impl<'a> GridScorer<'a> {
         for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
             site_indexes[aa_i].push(i + 1);
         }
-        let mut feature_a_scores = AAMap(std::array::from_fn(|_| &[] as &[f64]));
-        let mut feature_b_scores = AAMap(std::array::from_fn(|_| &[] as &[f64]));
+        let mut feature_a_scores = AAMap::<&[f64]>([&[]; 20]);
+        let mut feature_b_scores = AAMap::<&[f64]>([&[]; 20]);
         for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
             let aa_i = unsafe { AAIndex::from_byte_unchecked(aa_i as u8) };
             let n_sites_i = sites_containing_aa_i.len();
