@@ -1,13 +1,14 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
-use crate::{
-    datatypes::{AAIndex, AAMap, MAX_XMER},
-    leak_vec,
-};
+use crate::datatypes::{AAIndex, AAMap, MAX_XMER};
 use anyhow::Error;
 use borsh::BorshSerialize;
 use bumpalo::{Bump, collections::Vec};
-use std::{cmp, mem::{self, MaybeUninit}, ptr::addr_of_mut};
-pub use xmer::{XmerIndexableArray, XmerSize, xmer_sizes};
+use std::{
+    cmp,
+    mem::{self, MaybeUninit},
+    ptr::addr_of_mut,
+};
+pub use xmer::{XmerIndexableArray, XmerSize};
 mod avg_sdev_db;
 pub use avg_sdev_db::AvgSdevDB;
 mod pair_freq_db;
@@ -64,14 +65,10 @@ impl<'a> GridScorer<'a> {
         for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
             site_indexes[aa_i].push(i + 1);
         }
-        let mut feature_a_scores = AAMap(std::array::from_fn(|_| {
-            &[] as &[f64]
-        }));
-        let mut feature_b_scores = AAMap(std::array::from_fn(|_| {
-            &[] as &[f64]
-        }));
+        let mut feature_a_scores = AAMap::<&[f64]>([const { &[] }; 20]);
+        let mut feature_b_scores = AAMap::<&[f64]>([const { &[] }; 20]);
         for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
-            let aa_i = unsafe {AAIndex::from_byte_unchecked(aa_i as u8)};
+            let aa_i = unsafe { AAIndex::from_byte_unchecked(aa_i as u8) };
             let n_sites_i = sites_containing_aa_i.len();
             let feature_a_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
             let feature_b_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
