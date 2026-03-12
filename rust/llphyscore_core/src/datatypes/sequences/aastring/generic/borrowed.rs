@@ -88,6 +88,10 @@ impl<A> aa_str<A> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    /// `True` if length is zero.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
     /// Cast a slice of bytes as this type, without
     /// checking that the bytes are all valid instances
     /// of the underlying generic byte subset.
