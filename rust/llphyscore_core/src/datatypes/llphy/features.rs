@@ -1,6 +1,6 @@
 //! Datatypes for storing biophysical feature values
 //! associated to sequence(s).
-use crate::datatypes::DEFAULT_FEATURES;
+use crate::datatypes::FEATURE_NAMES;
 use anyhow::Error;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bumpalo::Bump;
@@ -76,7 +76,7 @@ impl<'a> ReferenceFeatureMatrix<'a> {
     /// but with a memory arena to hold the [`Self::data`] field.
     pub fn deserialize(buf: &mut &[u8], arena: &'a Bump) -> Result<Self, Error> {
         let feature_names_len = <usize>::deserialize(buf)?;
-        const KNOWN_FEATURE_NAMES_LEN: usize = DEFAULT_FEATURES.len();
+        const KNOWN_FEATURE_NAMES_LEN: usize = FEATURE_NAMES.len();
         if feature_names_len > KNOWN_FEATURE_NAMES_LEN {
             return Err(Error::msg(format!(
                 "[ReferenceFeatureMatrix::deserialize] expected at most {} feature names to be allocated, but asking for {}",

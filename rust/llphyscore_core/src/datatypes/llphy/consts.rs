@@ -2,7 +2,7 @@
 /// The maximum residue separation that Cai collected residue statistics for.
 pub const MAX_XMER: usize = 40;
 /// The default features calculated by Cai's old LLPhyScore program.
-pub const DEFAULT_FEATURES: [&'static str; 8] = [
+pub const FEATURE_NAMES: [&'static str; 8] = [
     "protein-water",
     "protein-carbon",
     "hydrogen bond (long-range)",

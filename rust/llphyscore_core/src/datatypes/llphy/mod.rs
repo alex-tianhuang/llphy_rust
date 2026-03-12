@@ -4,7 +4,7 @@
 //! [`grid_scorer`] for biophysical feature grids ([`GridScore`]s) and the models that make them ([`GridScorer`]s).
 //! [`grid_decoder`] for [`GridDecoder`], which turns biophysical feature grids into sequence-level features.
 //! [`consts`] for some constants.
-pub use consts::{DEFAULT_FEATURES, MAX_XMER, PAIR_NAMES_AND_FEATURE_NAMES};
+pub use consts::{FEATURE_NAMES, MAX_XMER, PAIR_NAMES_AND_FEATURE_NAMES};
 pub use features::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMatrix};
 pub use grid_decoder::GridDecoder;
 pub use grid_scorer::{GridScore, GridScorer};
