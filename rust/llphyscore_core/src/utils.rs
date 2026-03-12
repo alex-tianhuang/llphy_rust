@@ -37,8 +37,4 @@ macro_rules! derive_borsh_se_into {
         }
     };
 }
-use {
-    bumpalo::Bump,
-    std::{iter::Cloned, mem::ManuallyDrop},
-};
 pub(crate) use {derive_borsh_de_from, derive_borsh_se_into};
