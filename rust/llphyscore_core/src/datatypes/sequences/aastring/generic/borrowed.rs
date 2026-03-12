@@ -62,10 +62,12 @@ impl<A: AALike> aa_str<A> {
             if !c.is_ascii_whitespace() {
                 return Err(fail(c))
             }
-            let chunk_range = chunk_start..i;
-            slice.copy_within(chunk_range.clone(), len);
+            if chunk_start < i {
+                let chunk_range = chunk_start..i;
+                slice.copy_within(chunk_range.clone(), len);
+                len += chunk_range.len();
+            }
             chunk_start = i + 1;
-            len += chunk_range.len();
         }
         if chunk_start < slice.len() {
             let chunk_range = chunk_start..slice.len();
