@@ -18,10 +18,10 @@ use std::{
 /// 1. `std::io::stderr`
 /// 2. A `File` at a filepath given by the user.
 pub fn alloc_error_handler(
-    log_seq_errs: Option<PathBuf>,
+    log_seq_errs_to: Option<PathBuf>,
     arena: &Bump,
 ) -> Result<Box<'_, dyn Write>, Error> {
-    match log_seq_errs {
+    match log_seq_errs_to {
         Some(path) => {
             let writer = File::options().append(true).create(true).open(path)?;
             Ok(alloc_dyn_writer(writer, &arena))
