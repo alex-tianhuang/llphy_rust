@@ -68,12 +68,10 @@ impl<'a> Featurizer<'a> {
         self.with_pbar = with_pbar;
         self
     }
-    /// Check for keyboard interrupts
-    /// from python while running [`Self::featurize`].
-    #[cfg(feature = "pyo3")]
-    pub fn with_python_interrupter(mut self, py: pyo3::Python<'a>, arena: &'a Bump) -> Self {
-        let interrupter = arena.alloc(move || py.check_signals().map_err(Error::new))
-            as &dyn Fn() -> Result<(), Error>;
+    /// Check for interruption signals while running [`Self::featurize`].
+    /// 
+    /// Currently only used to check for KeyboardInterrupts from python.
+    pub fn with_interrupter(mut self, interrupter: &'a dyn Fn() -> Result<(), Error>) -> Self {
         self.interrupter = Some(interrupter);
         self
     }
