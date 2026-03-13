@@ -41,6 +41,7 @@ use std::{
 /// ```
 #[derive(Clone, Default, PartialEq)]
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[repr(transparent)]
 pub struct AAMap<T>(pub [T; AMINOACIDS.len()]);
 impl<T> AAMap<T> {
