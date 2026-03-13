@@ -1,8 +1,27 @@
-use std::{io::Write, path::Path};
-
+use std::{fs::File, io::Write, path::{Path, PathBuf}};
 use anyhow::Error;
-use bumpalo::{Bump, collections::Vec};
+use bumpalo::{Bump, boxed::Box, collections::Vec};
 use llphyscore_core::{datatypes::{FastaEntry, aa_canonical_str}, utils::{leak_vec, read_file}};
+use crate::utils::alloc_dyn_writer;
+
+/// Helper function for callers of [`read_fasta`].
+/// 
+/// Construct a type erased thing that logs errors,
+/// which can either be:
+/// 1. `std::io::stderr`
+/// 2. A `File` at a filepath given by the user.
+pub fn alloc_error_handler(log_seq_errs: Option<PathBuf>, arena: &Bump) -> Result<Box<'_, dyn Write>, Error> {
+    match log_seq_errs {
+        Some(path) => {
+            let writer = File::options().append(true).create(true).open(path)?;
+            Ok(alloc_dyn_writer(writer, &arena))
+        },
+        None => {
+            let writer = std::io::stderr().lock();
+            Ok(alloc_dyn_writer(writer, &arena))
+        }
+    }
+}
 
 /// Read the file at `path` into a memory arena,
 /// and parse it into a vector of [`FastaEntry`] structs.
