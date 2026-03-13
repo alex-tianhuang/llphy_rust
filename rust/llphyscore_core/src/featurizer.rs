@@ -111,9 +111,7 @@ impl<'a> Featurizer<'a> {
                 )
             });
             for (j, entry) in sequences.iter().enumerate() {
-                if let Some(f) = self.interrupter {
-                    f()?
-                }
+                self.interrupter.map(|f| f()).unwrap_or(Ok(()))?;
                 sequence_buffer.clear();
                 sequence_buffer.extend(entry.sequence.into_iter().map(Aminoacid::to_aaindex));
                 let scored = grid_scorer.score_sequence(&sequence_buffer, &temp_arena);
