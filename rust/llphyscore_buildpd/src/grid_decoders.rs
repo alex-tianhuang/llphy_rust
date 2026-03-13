@@ -42,6 +42,7 @@ pub fn build_griddecoders(scoredb_root: &Path, pkg_data_root: &Path) -> Result<(
                     grid_decoder_pair.serialize(&mut bytes)?;
                     let round_trip = GridDecoderPair::deserialize(&mut &*bytes)?;
                     assert!(&round_trip == grid_decoder_pair);
+                    std::fs::create_dir_all(&outdir)?;
                     let mut file = File::options().create(true).truncate(true).write(true).open(&outpath)?;
                     grid_decoder_pair.serialize(&mut file)?;
                 }

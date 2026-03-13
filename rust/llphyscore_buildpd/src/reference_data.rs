@@ -25,9 +25,8 @@ pub fn build_referencedata(scoredb_root: &Path, pkg_data_root: &Path) -> Result<
             model_train_base
         ));
         let matrix = load_reference_scores(&inpath, &arena)?;
-        let outpath = pkg_data_root
-            .join("human_reference_data")
-            .join(format!("{}.distr.bin", model_train_base));
+        let outdir = pkg_data_root.join("human_reference_data");
+        let outpath = outdir.join(format!("{}.distr.bin", model_train_base));
         bytes.clear();
         if outpath.exists() {
             let mut file = File::open(&outpath)?;
@@ -44,6 +43,7 @@ pub fn build_referencedata(scoredb_root: &Path, pkg_data_root: &Path) -> Result<
             matrix.serialize(&mut bytes)?;
             let round_trip = ReferenceFeatureMatrix::deserialize(&mut &*bytes, &arena)?;
             assert!(round_trip == matrix);
+            std::fs::create_dir_all(&outdir)?;
             let mut file = File::options()
                 .create(true)
                 .truncate(true)
