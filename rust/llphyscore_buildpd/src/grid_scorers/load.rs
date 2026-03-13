@@ -103,7 +103,7 @@ fn load_pair_freq_db_into(
         return Err(Error::msg(format!("unrecognized pair name: {}", pair_name)));
     };
     let mut bytes = Vec::new();
-    File::open(filepath)?.read_to_end(&mut bytes);
+    File::open(filepath)?.read_to_end(&mut bytes)?;
     let s = String::from_utf8(bytes)?;
     let pair_freq_db = PairFreqDB::init_with_nans(this);
     for line in s.lines() {
@@ -188,7 +188,7 @@ fn load_z_grid_db_into<'a>(
     arena: &'a Bump,
 ) -> Result<(), Error> {
     let mut bytes = Vec::new();
-    File::open(filepath)?.read_to_end(&mut bytes);
+    File::open(filepath)?.read_to_end(&mut bytes)?;
     let bytes = &*bytes;
     /// Helper struct for getting sorted floats out of this pickle file.
     #[derive(Deserialize, PartialEq, PartialOrd)]
@@ -291,7 +291,7 @@ fn load_one_xmer_avg_sdev_into(
     xmer: XmerSize,
 ) -> Result<(), Error> {
     let mut bytes = Vec::new();
-    File::open(filepath)?.read_to_end(&mut bytes);
+    File::open(filepath)?.read_to_end(&mut bytes)?;
     let s = String::from_utf8(bytes)?;
     for line in s.lines() {
         let [aa, rest @ ..] = line.trim_ascii_start().as_bytes() else {
