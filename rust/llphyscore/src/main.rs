@@ -75,7 +75,7 @@ fn main() -> Result<(), Error> {
     let featurizer = Featurizer::load_new(Path::new(PKG_DATA_ROOT), model_train_base, &arena)?
         .with_pbar(!(disable_pbar || quiet_override));
     let post_processor = load_post_processor(Path::new(PKG_DATA_ROOT), score_type, model_train_base, &arena)?;
-    let matrix = featurizer.featurize(sequences, &arena)?;
+    let matrix = featurizer.featurize(sequences.iter().map(|ent| ent.sequence), &arena)?;
     let matrix = post_processor.post_process(matrix, &arena)?;
     write_output(output_file, sequences, matrix, &arena)
 }
