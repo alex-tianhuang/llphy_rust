@@ -6,8 +6,11 @@
 //! [`consts`] for some constants.
 pub use consts::{FEATURE_NAMES, MAX_XMER, PAIR_NAMES_AND_FEATURE_NAMES};
 pub use features::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMatrix};
-pub use grid_decoder::{GridDecoder,GridDecoderPair};
-pub use grid_scorer::{GridScore, GridScorer};
+pub use grid_decoder::{GridDecoder, GridDecoderPair};
+pub use grid_scorer::{
+    AvgSdevDB, AvgSdevDBEntry, GridScore, GridScorer, PairFreqDB, PairFreqDBEntry,
+    XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable,
+};
 pub use model_train_base::ModelTrainingBase;
 pub use post_processor::{PostProcessor, ScoreType};
 mod consts;

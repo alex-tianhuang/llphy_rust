@@ -1,29 +1,31 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 //!
 //! Structs that turn a sequence into a residue-level feature grids.
-use crate::datatypes::{AAIndex, AAMap, MAX_XMER, llphy::grid_scorer::xmer::XmerSize};
+use crate::datatypes::{AAIndex, AAMap, MAX_XMER};
 use anyhow::Error;
+pub use avg_sdev_db::AvgSdevDB;
 use borsh::BorshSerialize;
 use bumpalo::Bump;
-use std::{mem::MaybeUninit, ptr::addr_of_mut};
-pub use xmer::XmerIndexableArray;
-mod avg_sdev_db;
-pub use avg_sdev_db::AvgSdevDB;
-mod pair_freq_db;
-mod xmer;
-mod z_grid_db;
 use bumpalo::collections::Vec;
 pub use pair_freq_db::PairFreqDB;
+use std::{mem::MaybeUninit, ptr::addr_of_mut};
+pub use xmer::{XmerIndexableArray, XmerSize};
 pub use z_grid_db::ZGridDB;
+mod avg_sdev_db;
+mod pair_freq_db;
 #[cfg(feature = "simd")]
 mod simd;
+mod xmer;
+mod z_grid_db;
 #[cfg(feature = "simd")]
-pub use simd::{AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridEntrySum, ZGridSubtable};
+pub use simd::{
+    AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
+};
 #[cfg(not(feature = "simd"))]
 mod no_simd;
 #[cfg(not(feature = "simd"))]
 pub use no_simd::{
-    AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridEntrySum, ZGridSubtable,
+    AvgSdevDBEntry, PairFreqDBEntry, PairFreqEntrySum, ZGridDBEntry, ZGridEntrySum, ZGridSubtable,
 };
 /// A struct that contains all the necessary data to
 /// make biophysical feature grids ([`GridScore`]s)

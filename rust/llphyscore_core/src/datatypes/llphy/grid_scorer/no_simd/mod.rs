@@ -2,7 +2,7 @@
 //! without the use of the #[portable_simd] feature.
 pub use avg_sdev_db::AvgSdevDBEntry;
 pub use pair_freq_db::{PairFreqDBEntry, PairFreqEntrySum};
-pub use z_grid_db::{ZGridSubtable, ZGridEntrySum};
-mod z_grid_db;
+pub use z_grid_db::{ZGridDBEntry, ZGridEntrySum, ZGridSubtable};
 mod avg_sdev_db;
 mod pair_freq_db;
+mod z_grid_db;

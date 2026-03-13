@@ -8,6 +8,8 @@ mod sequences;
 pub use sequences::{AAIndex, AAMap, AMINOACIDS, Aminoacid, FastaEntry, aa_canonical_str};
 mod llphy;
 pub use llphy::{
-    FEATURE_NAMES, FeatureMatrix, GridDecoder, GridScore, GridScorer, MAX_XMER, ModelTrainingBase, PostProcessor,
-    PAIR_NAMES_AND_FEATURE_NAMES, PostProcessedFeatureMatrix, ReferenceFeatureMatrix, ScoreType, GridDecoderPair
+    AvgSdevDB, AvgSdevDBEntry, FEATURE_NAMES, FeatureMatrix, GridDecoder, GridDecoderPair,
+    GridScore, GridScorer, MAX_XMER, ModelTrainingBase, PAIR_NAMES_AND_FEATURE_NAMES, PairFreqDB,
+    PairFreqDBEntry, PostProcessedFeatureMatrix, PostProcessor, ReferenceFeatureMatrix, ScoreType,
+    ZGridDB, ZGridDBEntry, ZGridSubtable, XmerIndexableArray, XmerSize
 };
