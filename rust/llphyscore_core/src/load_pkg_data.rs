@@ -2,8 +2,10 @@
 //!
 //! Database file structure
 //! -----------------------
+//! 
 //! This module assumes a specific directory structure
 //! for models and reference data, like so:
+//! ```text
 //! |- `feature_pairs`
 //! |  |- `S2.SUMPI`
 //! |  |  |- `gridscorer.bin`
@@ -18,7 +20,7 @@
 //!    |- `human.distr.bin`
 //!    |- `human+PDB.distr.bin`
 //!    \- `PDB.distr.bin`
-//!
+//! ```
 //! As you can see above, the three types of files are:
 //! 1. `gridscorer.bin`, which contains a [`GridScorer`]
 //! 2. `...model.bin`, which contains [`GridDecoderPair`]s
