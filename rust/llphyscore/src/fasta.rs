@@ -17,18 +17,24 @@ use std::{
 /// which can either be:
 /// 1. `std::io::stderr`
 /// 2. A `File` at a filepath given by the user.
+/// 3. Nothing on `--quiet` mode.
 pub fn alloc_error_handler(
     log_seq_errs_to: Option<PathBuf>,
+    quiet_override: bool,
     arena: &Bump,
 ) -> Result<Box<'_, dyn Write>, Error> {
+    if quiet_override {
+        let writer = std::io::sink();
+        return Ok(alloc_dyn_writer(writer, arena))
+    }
     match log_seq_errs_to {
         Some(path) => {
             let writer = File::options().append(true).create(true).open(path)?;
-            Ok(alloc_dyn_writer(writer, &arena))
+            Ok(alloc_dyn_writer(writer, arena))
         }
         None => {
             let writer = std::io::stderr().lock();
-            Ok(alloc_dyn_writer(writer, &arena))
+            Ok(alloc_dyn_writer(writer, arena))
         }
     }
 }
