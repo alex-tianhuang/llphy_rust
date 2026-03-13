@@ -1,7 +1,31 @@
 //! Some utility functions for the project
 //! that I couldn't bother organizing.
-use {anyhow::Error, bumpalo::{Bump, collections::Vec}, std::{fs::File, path::Path, io::{ErrorKind, Read as _}}};
+use {crate::datatypes::{FEATURE_NAMES, PAIR_NAMES_AND_FEATURE_NAMES}, anyhow::Error, bumpalo::{Bump, collections::Vec}, std::{fs::File, io::{ErrorKind, Read as _}, path::Path}};
 
+/// Shorthand for a list search.
+/// 
+/// Since we have this:
+/// ```
+/// const PAIR_NAMES_AND_FEATURE_NAMES: /* ... */ = [
+///     (pair_name_1, [feat_name_1a, feat_name_1b]),
+///     (pair_name_2, [feat_name_2a, feat_name_2b]),
+///     /* ... */
+/// ]
+/// ```
+/// Find the pair_name and pair which contain the given `feat_name`.
+pub fn lookup_f2p(feature_name: &str) -> Option<(&'static str, [&'static str; 2])> {
+    PAIR_NAMES_AND_FEATURE_NAMES.iter().find(|(_, names)| names.contains(&feature_name)).copied()
+}
+/// Shorthand for a list search over an `(&str, T)` list.
+/// 
+/// Lookup by the name in the first slot of the tuple.
+pub fn lookup_by_pair<'a, T>(data: &'a [(&'a str, T)], pair_name: &str) -> Option<&'a T> {
+    data.iter().find(|(name, _)| *name == pair_name).map(|t| &t.1)
+}
+/// Shorthand for finding the index of a `feat_name` in `FEATURE_NAMES`.
+pub fn lookup_findex(feat_name: &str) -> Option<usize> {
+    FEATURE_NAMES.iter().enumerate().find(|(_, name)| **name == feat_name).map(|(i, _)| i)
+}
 /// Read the file at `path` into the given memory arena as a vector of bytes.
 ///
 /// Dev note
