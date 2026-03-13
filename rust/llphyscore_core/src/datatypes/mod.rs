@@ -9,5 +9,5 @@ pub use sequences::{AAIndex, AAMap, AMINOACIDS, Aminoacid, FastaEntry, aa_canoni
 mod llphy;
 pub use llphy::{
     FEATURE_NAMES, FeatureMatrix, GridDecoder, GridScore, GridScorer, MAX_XMER, ModelTrainingBase,
-    PAIR_NAMES_AND_FEATURE_NAMES, PostProcessedFeatureMatrix, ReferenceFeatureMatrix, ScoreType,
+    PAIR_NAMES_AND_FEATURE_NAMES, PostProcessedFeatureMatrix, ReferenceFeatureMatrix, ScoreType, GridDecoderPair
 };
