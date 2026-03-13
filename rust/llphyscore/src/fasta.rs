@@ -1,21 +1,31 @@
-use std::{fs::File, io::Write, path::{Path, PathBuf}};
+use crate::utils::alloc_dyn_writer;
 use anyhow::Error;
 use bumpalo::{Bump, boxed::Box, collections::Vec};
-use llphyscore_core::{datatypes::{FastaEntry, aa_canonical_str}, utils::{leak_vec, read_file}};
-use crate::utils::alloc_dyn_writer;
+use llphyscore_core::{
+    datatypes::{FastaEntry, aa_canonical_str},
+    utils::{leak_vec, read_file},
+};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 /// Helper function for callers of [`read_fasta`].
-/// 
+///
 /// Construct a type erased thing that logs errors,
 /// which can either be:
 /// 1. `std::io::stderr`
 /// 2. A `File` at a filepath given by the user.
-pub fn alloc_error_handler(log_seq_errs: Option<PathBuf>, arena: &Bump) -> Result<Box<'_, dyn Write>, Error> {
+pub fn alloc_error_handler(
+    log_seq_errs: Option<PathBuf>,
+    arena: &Bump,
+) -> Result<Box<'_, dyn Write>, Error> {
     match log_seq_errs {
         Some(path) => {
             let writer = File::options().append(true).create(true).open(path)?;
             Ok(alloc_dyn_writer(writer, &arena))
-        },
+        }
         None => {
             let writer = std::io::stderr().lock();
             Ok(alloc_dyn_writer(writer, &arena))
@@ -25,7 +35,7 @@ pub fn alloc_error_handler(log_seq_errs: Option<PathBuf>, arena: &Bump) -> Resul
 
 /// Read the file at `path` into a memory arena,
 /// and parse it into a vector of [`FastaEntry`] structs.
-/// 
+///
 /// Report errors to `err_out`, much like using `stderr`.
 ///
 /// Errors
@@ -34,7 +44,11 @@ pub fn alloc_error_handler(log_seq_errs: Option<PathBuf>, arena: &Bump) -> Resul
 /// 1. The file at `path` cannot be read from.
 /// 2. If the file at `path` is empty or does not start with a `>` character.
 /// 3. If errors cannot be written to `err_out`.
-pub fn read_fasta<'a>(path: &Path, arena: &'a Bump, err_out: &mut dyn Write) -> Result<&'a [FastaEntry<'a>], Error> {
+pub fn read_fasta<'a>(
+    path: &Path,
+    arena: &'a Bump,
+    err_out: &mut dyn Write,
+) -> Result<&'a [FastaEntry<'a>], Error> {
     let bytes = read_file(path, arena)?;
     if bytes.is_empty() {
         return Err(Error::msg("got empty file"));
@@ -42,12 +56,12 @@ pub fn read_fasta<'a>(path: &Path, arena: &'a Bump, err_out: &mut dyn Write) -> 
     if !bytes.starts_with(&[b'>']) {
         return Err(Error::msg("got non-`>` character on first line"));
     }
-    let mut entries = Vec::new_in(arena); 
+    let mut entries = Vec::new_in(arena);
     for notification in parse_fasta_entries(leak_vec(bytes)) {
         match notification {
             Ok(entry) => {
                 entries.push(entry);
-            },
+            }
             Err(e) => {
                 writeln!(err_out, "{}", e)?;
             }
@@ -58,7 +72,7 @@ pub fn read_fasta<'a>(path: &Path, arena: &'a Bump, err_out: &mut dyn Write) -> 
 /// Iterate over a buffer with FASTA-formatted sequences
 /// turned into [`FastaEntry`] structs, also returning parsing
 /// errors as they come up.
-/// 
+///
 /// This function will treat the first line of this slice as a header
 /// (assumes it starts with `>` character). On debug builds this crashes
 /// the program if the assumption is wrong.
@@ -94,9 +108,7 @@ fn parse_fasta_entries(
             }
         }
         let header = match str::from_utf8(header_slice) {
-            Ok(header) => {
-                header
-            }
+            Ok(header) => header,
             Err(e) => {
                 return Some(Err(format!(
                     "could not parse entry ({}): {}",
@@ -116,13 +128,11 @@ fn parse_fasta_entries(
                     Ok(FastaEntry { header, sequence })
                 }
             }
-            Err(e) => Err(format!(
-                "could not parse entry ({}): {}",
-                e, header
-            )),
+            Err(e) => Err(format!("could not parse entry ({}): {}", e, header)),
         };
         Some(r)
-    }).map(|r| r.map_err(Error::msg))
+    })
+    .map(|r| r.map_err(Error::msg))
 }
 /// Find the index of the next newline from the beginning of this slice.
 fn end_of_current_header(bytes: &[u8]) -> Option<usize> {
