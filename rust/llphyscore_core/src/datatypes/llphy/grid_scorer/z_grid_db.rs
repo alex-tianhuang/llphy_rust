@@ -56,7 +56,7 @@ impl<'a> ZGridDB<'a> {
     }
     /// Convert this uninitialized [`ZGridDB`]
     /// to an uninitialized version of its inner field.
-    fn as_uninit_inner(this: &mut MaybeUninit<Self>) -> &mut AAMap<XmerIndexableArray<MaybeUninit<ZGridSubtable<'a>>>> {
+    pub fn as_uninit_inner(this: &mut MaybeUninit<Self>) -> &mut AAMap<XmerIndexableArray<MaybeUninit<ZGridSubtable<'a>>>> {
         // SAFETY: ZGridDB has #[repr(transparent)] over its inner field.
         unsafe { 
             &mut *this.as_mut_ptr().cast::<AAMap<XmerIndexableArray<MaybeUninit<ZGridSubtable<'_>>>>>()
