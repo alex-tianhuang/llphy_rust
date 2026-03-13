@@ -2,3 +2,4 @@
 pub mod datatypes;
 pub mod featurizer;
 pub mod utils;
+pub mod load_pkg_data;
