@@ -14,7 +14,7 @@ use llphyscore_core::{
     featurizer::Featurizer,
     load_pkg_data::load_post_processor,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 mod fasta;
 mod output;
 mod utils;
@@ -56,6 +56,7 @@ pub struct Args {
     #[arg(short, long, action)]
     quiet: bool,
 }
+const PKG_DATA_ROOT: &'static str = env!("PKG_DATA_ROOT");
 fn main() -> Result<(), Error> {
     let Args {
         input_file,
@@ -71,9 +72,9 @@ fn main() -> Result<(), Error> {
         let mut err_out = fasta::alloc_error_handler(log_seq_errs_to, quiet_override, &arena)?;
         read_fasta(&input_file, &arena, &mut *err_out)?
     };
-    let featurizer = Featurizer::load_new(pkg_data_root, model_train_base, &arena)?
+    let featurizer = Featurizer::load_new(Path::new(PKG_DATA_ROOT), model_train_base, &arena)?
         .with_pbar(!(disable_pbar || quiet_override));
-    let post_processor = load_post_processor(pkg_data_root, score_type, model_train_base, &arena)?;
+    let post_processor = load_post_processor(Path::new(PKG_DATA_ROOT), score_type, model_train_base, &arena)?;
     let matrix = featurizer.featurize(sequences, &arena)?;
     let matrix = post_processor.post_process(matrix, &arena)?;
     write_output(output_file, sequences, matrix, &arena)
