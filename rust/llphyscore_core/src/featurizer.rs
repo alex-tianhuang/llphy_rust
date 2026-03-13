@@ -20,11 +20,11 @@ use crate::{
 };
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use std::fmt::Write;
 use std::path::Path;
-
 /// A struct helping compute the biophysical features of many sequences.
-/// 
+///
 /// This struct is just my builder pattern struct so that I can lump all the
 /// configurable elements of a computation (does the user want a progress
 /// bar, does it need to check for keyboard interrupts, etc.) into an
@@ -32,11 +32,15 @@ use std::path::Path;
 pub struct Featurizer<'a> {
     pkg_data_root: &'a Path,
     grid_decoders: &'a [(&'a str, GridDecoderPair)],
+    /// Closure that checks for interrupts in the middle of [`Featurizer::featurize`],
+    /// for example for python code where keyboard interrupts do not immediately
+    /// abort the thread.
     interrupter: Option<&'a dyn Fn() -> Result<(), Error>>,
-    pbar_provider: Option<fn(usize) -> ProgressBar>,
+    /// Flag to turn on/off progress bar during [`Featurizer::featurize`].
+    with_pbar: bool,
 }
 impl<'a> Featurizer<'a> {
-    /// Load a featurizer with no interrupter or pbar_provider (default)
+    /// Load a featurizer with no interrupter and pbar disabled (default)
     /// using only the package data needed for [`load_grid_decoders`].
     pub fn load_new(
         pkg_data_root: &'a Path,
@@ -48,27 +52,12 @@ impl<'a> Featurizer<'a> {
             pkg_data_root,
             grid_decoders,
             interrupter: None,
-            pbar_provider: None,
+            with_pbar: false,
         })
     }
     /// Add a `pbar` to this featurizer if requested.
     pub fn with_pbar(mut self, with_pbar: bool) -> Self {
-        use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-        use std::fmt::Write;
-
-        /// Pbar in the tqdm style.
-        pub fn pbar(n: usize) -> ProgressBar {
-            ProgressBar::new(n as u64).with_style(
-                ProgressStyle::with_template(
-                    "{percent}%[{wide_bar}] {pos}/{len} [{elapsed}<{eta}, {rate}]",
-                )
-                .unwrap()
-                .with_key("rate", |state: &ProgressState, w: &mut dyn Write| {
-                    write!(w, "{:.2}it/s", state.per_sec()).unwrap();
-                }),
-            )
-        }
-        self.pbar_provider = with_pbar.then_some(pbar);
+        self.with_pbar = with_pbar;
         self
     }
     /// Given sequences and PDB statistics,
@@ -104,7 +93,7 @@ impl<'a> Featurizer<'a> {
             let [feature_idx_a, feature_idx_b] = feature_names_for_pair.map(lookup_findex);
             let mut sequence_buffer = Vec::with_capacity_in(max_seq_len, &temp_arena);
             let grid_scorer = load_grid_scorer(self.pkg_data_root, pair_name, &temp_arena)?;
-            let pbar = self.pbar_provider.map(|f| f(sequences.len()));
+            let pbar = self.with_pbar.then(|| pbar(sequences.len()));
             pbar.as_ref().map(|pbar| {
                 pbar.println(
                     bumpalo::format!(in &temp_arena, "COMPUTING FEATURE PAIR {}", pair_name),
@@ -150,4 +139,17 @@ impl<'a> Featurizer<'a> {
             data,
         })
     }
+}
+
+/// Pbar in the tqdm style.
+pub fn pbar(n: usize) -> ProgressBar {
+    ProgressBar::new(n as u64).with_style(
+        ProgressStyle::with_template(
+            "{percent}%[{wide_bar}] {pos}/{len} [{elapsed}<{eta}, {rate}]",
+        )
+        .unwrap()
+        .with_key("rate", |state: &ProgressState, w: &mut dyn Write| {
+            write!(w, "{:.2}it/s", state.per_sec()).unwrap();
+        }),
+    )
 }
