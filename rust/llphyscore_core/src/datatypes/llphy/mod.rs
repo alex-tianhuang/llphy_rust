@@ -9,10 +9,10 @@ pub use features::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMa
 pub use grid_decoder::{GridDecoder,GridDecoderPair};
 pub use grid_scorer::{GridScore, GridScorer};
 pub use model_train_base::ModelTrainingBase;
-pub use score_type::ScoreType;
+pub use post_processor::{PostProcessor, ScoreType};
 mod consts;
 mod features;
 mod grid_decoder;
 mod grid_scorer;
 mod model_train_base;
-mod score_type;
+mod post_processor;
