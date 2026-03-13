@@ -13,7 +13,7 @@
 
 use crate::{
     datatypes::{
-        Aminoacid, FEATURE_NAMES, FastaEntry, FeatureMatrix, GridDecoderPair, ModelTrainingBase,
+        Aminoacid, FEATURE_NAMES, FeatureMatrix, GridDecoderPair, ModelTrainingBase, aa_canonical_str,
     },
     load_pkg_data::{load_grid_decoders, load_grid_scorer},
     utils::{lookup_by_pair, lookup_f2p, lookup_findex},
@@ -48,28 +48,45 @@ impl<'a> Featurizer<'a> {
         arena: &'a Bump,
     ) -> Result<Self, Error> {
         let grid_decoders = load_grid_decoders(pkg_data_root, model_train_base, arena)?;
-        Ok(Self {
+        Ok(Self::from_parts(pkg_data_root, grid_decoders))
+    }
+    /// Make a featurizer with no interrupter and pbar disabled (default)
+    /// using a `pkg_data_root` and `grid_decoders`.
+    pub fn from_parts(
+        pkg_data_root: &'a Path,
+        grid_decoders: &'a [(&'a str, GridDecoderPair)],
+    ) -> Self {
+        Self {
             pkg_data_root,
             grid_decoders,
             interrupter: None,
             with_pbar: false,
-        })
+        }
     }
     /// Add a `pbar` to this featurizer if requested.
     pub fn with_pbar(mut self, with_pbar: bool) -> Self {
         self.with_pbar = with_pbar;
         self
     }
+    /// Check for keyboard interrupts
+    /// from python while running [`Self::featurize`].
+    #[cfg(feature = "pyo3")]
+    pub fn with_python_interrupter(mut self, py: pyo3::Python<'a>, arena: &'a Bump) -> Self {
+        let interrupter = arena.alloc(move || py.check_signals().map_err(Error::new))
+            as &dyn Fn() -> Result<(), Error>;
+        self.interrupter = Some(interrupter);
+        self
+    }
     /// Given sequences and PDB statistics,
     /// compute all biophysical sequence features + a `feature_sum`.
-    pub fn featurize<'b>(
+    pub fn featurize<'b, 'c>(
         &self,
-        sequences: &[FastaEntry<'_>],
+        sequences: impl ExactSizeIterator<Item = &'c aa_canonical_str> + Clone,
         arena: &'b Bump,
     ) -> Result<FeatureMatrix<'b, i64>, Error> {
         let num_features = FEATURE_NAMES.len();
         let num_sequences = sequences.len();
-        let Some(max_seq_len) = sequences.iter().map(|ent| ent.sequence.len()).max() else {
+        let Some(max_seq_len) = sequences.clone().map(|seq| seq.len()).max() else {
             return Ok(FeatureMatrix {
                 feature_names: &FEATURE_NAMES,
                 data: &mut [],
@@ -99,10 +116,10 @@ impl<'a> Featurizer<'a> {
                     bumpalo::format!(in &temp_arena, "COMPUTING FEATURE PAIR {}", pair_name),
                 )
             });
-            for (j, entry) in sequences.iter().enumerate() {
+            for (j, seq) in sequences.clone().enumerate() {
                 self.interrupter.map(|f| f()).unwrap_or(Ok(()))?;
                 sequence_buffer.clear();
-                sequence_buffer.extend(entry.sequence.into_iter().map(Aminoacid::to_aaindex));
+                sequence_buffer.extend(seq.into_iter().map(Aminoacid::to_aaindex));
                 let scored = grid_scorer.score_sequence(&sequence_buffer, &temp_arena);
                 if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
