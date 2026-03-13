@@ -1,47 +1,26 @@
 //! Module defining [`GridDecoder`],
 //! a struct that takes a [`GridScore`], a residue-level feature grid
 //! and turns it into an integer feature value using some thresholding rules.
-//! 
+//!
 //! [`GridScore`]: crate::datatypes::llphy::GridScore
-use anyhow::Error;
-use borsh::{BorshDeserialize, BorshSerialize};
-use bumpalo::Bump;
 use crate::datatypes::AAMap;
-use std::{mem::{MaybeUninit}, ops::{Deref, DerefMut}, ptr::addr_of_mut};
+use borsh::{BorshDeserialize, BorshSerialize};
+use std::ops::{Deref, DerefMut};
 
 /// Two [`GridDecoder`]s with a deserialize implementation.
-#[derive(BorshSerialize, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct GridDecoderPair {
     pub decoder_a: GridDecoder,
-    pub decoder_b: GridDecoder
+    pub decoder_b: GridDecoder,
 }
 /// Takes a [`GridScore`], a residue-level feature grid
 /// and turns it into a integer-valued feature using some thresholding rules.
-/// 
+///
 /// [`GridScore`]: crate::datatypes::llphy::GridScore
 #[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct GridDecoder {
     pub sign: i8,
     pub thresholds: Thresholds,
-}
-impl GridDecoderPair {
-    /// Moral equivalent of implementing deserialization on [`GridDecoderPair`],
-    /// but does it in a memory arena and returns a reference to it.
-    pub fn deserialize<'a>(buf: &mut &[u8], arena: &'a Bump) -> Result<&'a Self, Error> {
-        let this = arena.alloc_with(<MaybeUninit<Self>>::uninit);
-        let target = this.as_mut_ptr();
-        // SAFETY: target is a valid memory addr for a `GridDecoderPair`,
-        //         therefore so is the calculated pointer to `decoder_a`.
-        let decoder_a = unsafe { &mut *addr_of_mut!((*target).decoder_a).cast::<MaybeUninit<GridDecoder>>()};
-        // SAFETY: target is a valid memory addr for a `GridDecoderPair`,
-        //         therefore so is the calculated pointer to `decoder_b`.
-        let decoder_b = unsafe { &mut *addr_of_mut!((*target).decoder_b).cast::<MaybeUninit<GridDecoder>>()};
-        for target in [decoder_a, decoder_b] {
-            target.write(GridDecoder::deserialize(buf)?);
-        }
-        // SAFETY: just initialized all fields
-        Ok(unsafe { this.assume_init_ref() })
-    }
 }
 impl GridDecoder {
     /// Compute a sequence-level feature
