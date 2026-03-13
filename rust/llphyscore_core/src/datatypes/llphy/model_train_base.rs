@@ -25,3 +25,11 @@ impl Display for ModelTrainingBase {
         f.write_str(s)
     }
 }
+#[cfg(feature = "pyo3")]
+impl<'a, 'py> pyo3::FromPyObject<'a, 'py> for ModelTrainingBase {
+    type Error = pyo3::PyErr;
+    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
+        let s = obj.extract()?;
+        Ok(ModelTrainingBase::from_str(s, false).map_err(anyhow::Error::msg)?)
+    }
+}

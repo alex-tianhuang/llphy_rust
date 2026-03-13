@@ -31,6 +31,14 @@ pub enum PostProcessor<'a> {
     /// Report values in as percentiles compared to the human reference IDRome.
     Percentile(ReferenceFeatureMatrix<'a>),
 }
+#[cfg(feature = "pyo3")]
+impl<'a, 'py> pyo3::FromPyObject<'a, 'py> for ScoreType {
+    type Error = pyo3::PyErr;
+    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
+        let s = obj.extract()?;
+        Ok(ScoreType::from_str(s, false).map_err(Error::msg)?)
+    }
+}
 impl<'a> PostProcessor<'a> {
     /// Make a new post-processor that turns raw feature values into z-scores.
     pub fn new_zscore(ref_scores: ReferenceFeatureMatrix<'a>, arena: &'a Bump) -> Self {
