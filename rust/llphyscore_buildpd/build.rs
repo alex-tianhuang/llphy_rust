@@ -4,6 +4,7 @@ use std::{
     process::Command,
 };
 
+/// Python discovery script written by Claude Sonnet 4.6.
 fn main() {
     // Re-run if any of the env vars that influence Python discovery change.
     println!("cargo:rerun-if-env-changed=PYO3_PYTHON");
