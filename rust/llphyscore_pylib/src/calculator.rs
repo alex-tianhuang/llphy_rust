@@ -37,9 +37,6 @@ pub struct LLPhyScoreCalculator {
     /// Singleton of all [`GridDecoderPair`]s
     /// for the given `model_training_base`.
     grid_decoders: &'static [(&'static str, GridDecoderPair)],
-    /// Whether a progress bar is
-    /// displayed during the computation.
-    with_pbar: bool,
 }
 /// A helper struct for [`LLPhyScoreCalculator::calculate`]
 /// that supports passing in lists and dictionaries.
@@ -55,38 +52,37 @@ impl LLPhyScoreCalculator {
     /// Make a new `LLPhyScoreCalculator` from the given
     /// keyword arguments.
     /// 
-    /// Arguments
-    /// ---------
+    /// Argument
+    /// --------
     /// model_training_base : "human" | "human+PDB" | "PDB", default = "human+PDB"
     ///                     The dataset that the LLPhyScore model was trained on.
     ///                     Essentially, there are three models trained on different
     ///                     negative datasets which this argument selects for.
-    /// with_pbar : bool, default = true
-    ///           When set, display a progress bar with the computation.
     #[new]
-    #[pyo3(signature = (*, model_training_base = ModelTrainingBase::HumanPDB, with_pbar = true))]
+    #[pyo3(signature = (*, model_training_base = ModelTrainingBase::HumanPDB))]
     pub fn new(
         py: Python,
         model_training_base: ModelTrainingBase,
-        with_pbar: bool,
     ) -> PyResult<Self> {
         let grid_decoders = load_grid_decoders_static(py, model_training_base)?;
         Ok(Self {
             model_training_base,
             grid_decoders,
-            with_pbar,
         })
     }
     /// Compute LLPhyScore features from the given `sequences`.
     /// 
     /// Arguments
     /// ---------
+    /// sequences : list[str] | dict[..., str]
+    ///            See section below.
     /// score_type : "raw" | "z-score" | "percentile", default = "percentile"
     ///            The type of score to be reported after computing the raw scores.
     ///            Z-scores and percentiles will be computed in reference to the
     ///            human IDRome.
-    /// sequences : list[str] | dict[..., str]
-    ///            See below.
+    /// disable_pbar : bool, default = false
+    ///              By default, some progress bars are shown while doing the computation
+    ///              of each feature pair. This option turns it off.
     /// 
     /// Sequences
     /// ---------
@@ -103,18 +99,19 @@ impl LLPhyScoreCalculator {
     /// 
     /// If any strings expected to contain only aminoacids have unexpected
     /// characters, the function will error before running any computations.
-    #[pyo3(signature = (sequences, *, score_type = ScoreType::Percentile))]
+    #[pyo3(signature = (sequences, *, score_type = ScoreType::Percentile, disable_pbar = false))]
     pub fn calculate<'py>(
         &self,
         py: Python<'py>,
         sequences: Bound<'py, PyAny>,
         score_type: ScoreType,
+        disable_pbar: bool
     ) -> PyResult<Bound<'py, PyAny>> {
         let arena = Bump::new();
         let input = CalculatorInput::extract(&sequences, &arena)?;
         let interrupter = || py.check_signals().map_err(Error::new);
         let featurizer = Featurizer::from_parts(Path::new(PKG_DATA_ROOT), self.grid_decoders)
-            .with_pbar(self.with_pbar)
+            .with_pbar(!disable_pbar)
             .with_interrupter(&interrupter);
         let post_processor = load_post_processor(
             Path::new(PKG_DATA_ROOT),
