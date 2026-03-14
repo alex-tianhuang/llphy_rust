@@ -1,3 +1,6 @@
+//! Build script helper that sets up the package data
+//! (i.e. model thresholds/signs and human reference data)
+//! that these LLPhyScore packages are expecting.
 use crate::{grid_decoders::build_griddecoders, grid_scorers::build_gridscorers, reference_data::build_referencedata};
 use anyhow::Error;
 use clap::Parser;
