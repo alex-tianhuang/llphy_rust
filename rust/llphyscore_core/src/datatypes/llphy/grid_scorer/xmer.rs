@@ -1,7 +1,6 @@
 //! Module defining [`XmerIndexableArray`] and [`XmerSize`].
 use std::{num::NonZero, ops::{Index, IndexMut}};
 use borsh::{BorshDeserialize, BorshSerialize};
-
 use crate::datatypes::MAX_XMER;
 
 /// A newtype wrapper that indicates something is
@@ -16,6 +15,7 @@ pub struct XmerIndexableArray<T>([T; MAX_XMER]);
 #[derive(Clone, Copy)]
 pub struct XmerSize(NonZero<usize>);
 impl<T> XmerIndexableArray<T> {
+    /// Constructor.
     pub const fn new(arr: [T; MAX_XMER]) -> Self {
         Self(arr)
     }

@@ -1,0 +1,11 @@
+[package]
+name = "llphyscore_pylib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+bumpalo = { version = "3.20.2", features = ["collections"] }
+lazy_static = "1.5.0"
+llphyscore_core = { version = "0.1.0", path = "../llphyscore_core", features = ["pyo3"] }
+pyo3 = { version = "0.28.2", features = ["extension-module"] }

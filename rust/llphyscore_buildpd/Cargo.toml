@@ -1,0 +1,15 @@
+[package]
+name = "llphyscore-buildpd"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+bumpalo = { version = "3.20.2" }
+clap = { version = "4.6.0", features = ["derive"] }
+pyo3 = { version = "0.28.2", features = ["auto-initialize"], default-features = false }
+llphyscore_core = { path = "../llphyscore_core", features = ["serde"] }
+serde-pickle = "1.2.0"
+serde = { version = "1.0.228", features = ["derive"] }
+borsh = "1.6.0"
+csv = "1.4.0"

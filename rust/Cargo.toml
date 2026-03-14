@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["llphy_lib-260227"]
+members = ["llphy_lib-260227", "llphyscore", "llphyscore_buildpd", "llphyscore_core", "llphyscore_pylib"]
