@@ -33,6 +33,7 @@ pub struct LLPhyScoreCalculator {
     /// The data that the LLPhyScore model was trained on.
     /// 
     /// See [`ModelTrainingBase`] variants.
+    #[pyo3(get)]
     model_training_base: ModelTrainingBase,
     /// Singleton of all [`GridDecoderPair`]s
     /// for the given `model_training_base`.
@@ -122,6 +123,11 @@ impl LLPhyScoreCalculator {
         let matrix = featurizer.featurize(input.sequences().iter().cloned(), &arena)?;
         let matrix = post_processor.post_process(matrix, &arena)?;
         Ok(input.serialize(matrix, py)?)
+    }
+    /// Path to the `llphyscore` database that this calculator uses.
+    #[getter]
+    pub fn database_path<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
+        PyString::intern(py, PKG_DATA_ROOT)
     }
 }
 impl<'a, 'py> CalculatorInput<'a, 'py> {

@@ -15,14 +15,19 @@ pub enum ModelTrainingBase {
     /// Model was trained on the PDB + human proteome negative dataset.
     HumanPDB,
 }
-impl Display for ModelTrainingBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
+impl ModelTrainingBase {
+    /// Turn this [`ModelTrainingBase`] into an equivalent string.
+    fn to_str(&self) -> &'static str {
+        match self {
             Self::Human => "human",
             Self::PDB => "PDB",
             Self::HumanPDB => "human+PDB",
-        };
-        f.write_str(s)
+        }
+    }
+}
+impl Display for ModelTrainingBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_str())
     }
 }
 #[cfg(feature = "pyo3")]
@@ -31,5 +36,14 @@ impl<'a, 'py> pyo3::FromPyObject<'a, 'py> for ModelTrainingBase {
     fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> Result<Self, Self::Error> {
         let s = obj.extract()?;
         Ok(ModelTrainingBase::from_str(s, false).map_err(anyhow::Error::msg)?)
+    }
+}
+#[cfg(feature = "pyo3")]
+impl<'py> pyo3::IntoPyObject<'py> for ModelTrainingBase {
+    type Target = pyo3::types::PyString;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(pyo3::types::PyString::intern(py, self.to_str()))
     }
 }
