@@ -12,6 +12,7 @@ Given one or more amino acid sequences, LLPhyScore computes a set of biophysical
 ## Repository Structure
 
 ```
+pkg_data/              # Model data files and human IDRome scores, required by packages
 rust/
   llphyscore_core/     # Core library: featurization, datatypes, scoring
   llphyscore/          # CLI binary: reads FASTA, writes CSV
