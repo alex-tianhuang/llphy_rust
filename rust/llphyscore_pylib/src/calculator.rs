@@ -30,10 +30,6 @@ use std::{borrow::Cow, path::Path};
 #[pyclass]
 #[pyo3(frozen)]
 pub struct LLPhyScoreCalculator {
-    /// The type of score to be computed.
-    /// 
-    /// See [`ScoreType`] variants.
-    score_type: ScoreType,
     /// The data that the LLPhyScore model was trained on.
     /// 
     /// See [`ModelTrainingBase`] variants.
@@ -61,10 +57,6 @@ impl LLPhyScoreCalculator {
     /// 
     /// Arguments
     /// ---------
-    /// score_type : "raw" | "z-score" | "percentile", default = "percentile"
-    ///            The type of score to be reported after computing the raw scores.
-    ///            Z-scores and percentiles will be computed in reference to the
-    ///            human IDRome.
     /// model_training_base : "human" | "human+PDB" | "PDB", default = "human+PDB"
     ///                     The dataset that the LLPhyScore model was trained on.
     ///                     Essentially, there are three models trained on different
@@ -72,16 +64,14 @@ impl LLPhyScoreCalculator {
     /// with_pbar : bool, default = true
     ///           When set, display a progress bar with the computation.
     #[new]
-    #[pyo3(signature = (*, score_type = ScoreType::Percentile, model_training_base = ModelTrainingBase::HumanPDB, with_pbar = true))]
+    #[pyo3(signature = (*, model_training_base = ModelTrainingBase::HumanPDB, with_pbar = true))]
     pub fn new(
         py: Python,
-        score_type: ScoreType,
         model_training_base: ModelTrainingBase,
         with_pbar: bool,
     ) -> PyResult<Self> {
         let grid_decoders = load_grid_decoders_static(py, model_training_base)?;
         Ok(Self {
-            score_type,
             model_training_base,
             grid_decoders,
             with_pbar,
@@ -89,8 +79,17 @@ impl LLPhyScoreCalculator {
     }
     /// Compute LLPhyScore features from the given `sequences`.
     /// 
-    /// Argument
-    /// --------
+    /// Arguments
+    /// ---------
+    /// score_type : "raw" | "z-score" | "percentile", default = "percentile"
+    ///            The type of score to be reported after computing the raw scores.
+    ///            Z-scores and percentiles will be computed in reference to the
+    ///            human IDRome.
+    /// sequences : list[str] | dict[..., str]
+    ///            See below.
+    /// 
+    /// Sequences
+    /// ---------
     /// The `sequences` argument must either be:
     /// 1. A list of aminoacid strings (capitalized, no whitespace), or
     /// 2. A dictionary of arbitrary keys to aminoacid strings (capitalized, no whitespace)
@@ -104,10 +103,12 @@ impl LLPhyScoreCalculator {
     /// 
     /// If any strings expected to contain only aminoacids have unexpected
     /// characters, the function will error before running any computations.
+    #[pyo3(signature = (sequences, *, score_type = ScoreType::Percentile))]
     pub fn calculate<'py>(
         &self,
         py: Python<'py>,
         sequences: Bound<'py, PyAny>,
+        score_type: ScoreType,
     ) -> PyResult<Bound<'py, PyAny>> {
         let arena = Bump::new();
         let input = CalculatorInput::extract(&sequences, &arena)?;
@@ -117,7 +118,7 @@ impl LLPhyScoreCalculator {
             .with_interrupter(&interrupter);
         let post_processor = load_post_processor(
             Path::new(PKG_DATA_ROOT),
-            self.score_type,
+            score_type,
             self.model_training_base,
             &arena,
         )?;
