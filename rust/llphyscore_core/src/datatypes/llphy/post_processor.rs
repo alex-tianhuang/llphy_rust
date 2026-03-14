@@ -6,7 +6,7 @@ use clap::ValueEnum;
 
 use crate::datatypes::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMatrix};
 /// The type of score to return.
-#[derive(Clone, ValueEnum)]
+#[derive(Clone, Copy, ValueEnum)]
 #[value(verbatim_doc_comment)]
 pub enum ScoreType {
     /// Report raw `llphyscore` values and features.
