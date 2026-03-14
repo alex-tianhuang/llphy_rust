@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use pyo3::{Bound, PyResult, pymodule, types::{PyModule, PyModuleMethods}};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use crate::calculator::LLPhyScoreCalculator;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+mod calculator;
+mod utils;
+const PKG_DATA_ROOT: &'static str = env!("PKG_DATA_ROOT");
+#[pymodule]
+fn llphyscore(m: Bound<PyModule>) -> PyResult<()> {
+    m.add_class::<LLPhyScoreCalculator>()
 }
