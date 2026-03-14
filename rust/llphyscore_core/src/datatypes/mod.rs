@@ -10,6 +10,7 @@ mod llphy;
 pub use llphy::{
     AvgSdevDB, AvgSdevDBEntry, FEATURE_NAMES, FeatureMatrix, GridDecoder, GridDecoderPair,
     GridScore, GridScorer, MAX_XMER, ModelTrainingBase, PAIR_NAMES_AND_FEATURE_NAMES, PairFreqDB,
-    PairFreqDBEntry, PostProcessedFeatureMatrix, PostProcessor, ReferenceFeatureMatrix, ScoreType,
-    ZGridDB, ZGridDBEntry, ZGridSubtable, XmerIndexableArray, XmerSize, Thresholds
+    PairFreqDBEntry, PostProcessedFeatureMatrix, PostProcessedFeatureVector, PostProcessor,
+    ReferenceFeatureMatrix, ScoreType, Thresholds, XmerIndexableArray, XmerSize, ZGridDB,
+    ZGridDBEntry, ZGridSubtable,
 };

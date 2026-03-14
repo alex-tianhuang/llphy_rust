@@ -5,7 +5,9 @@
 //! [`grid_decoder`] for [`GridDecoder`] / [`GridDecoderPair`], which turns biophysical feature grids into integer-valued features.
 //! [`consts`] for some constants.
 pub use consts::{FEATURE_NAMES, MAX_XMER, PAIR_NAMES_AND_FEATURE_NAMES};
-pub use features::{FeatureMatrix, PostProcessedFeatureMatrix, ReferenceFeatureMatrix};
+pub use features::{
+    FeatureMatrix, PostProcessedFeatureMatrix, PostProcessedFeatureVector, ReferenceFeatureMatrix,
+};
 pub use grid_decoder::{GridDecoder, GridDecoderPair, Thresholds};
 pub use grid_scorer::{
     AvgSdevDB, AvgSdevDBEntry, GridScore, GridScorer, PairFreqDB, PairFreqDBEntry,
