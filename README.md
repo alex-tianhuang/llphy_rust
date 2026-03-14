@@ -28,11 +28,14 @@ python/
 **Requirements:** Python 3.8+, pip, Rust toolchain (install from [rustup.rs](https://rustup.rs))
 
 ```bash
+# Download this repo
+git clone https://github.com/alex-tianhuang/llphy_rust.git
+cd llphy_rust/rust/llphyscore_pylib
+
 # Install maturin
 pip install maturin
 
 # Build and install the Python package
-cd rust/llphyscore_pylib
 maturin build --release
 pip install ../../target/wheels/llphyscore-*.whl
 ```
@@ -66,7 +69,11 @@ results = calc.calculate(sequences, score_type="z-score", disable_pbar=True)
 **Requirements:** Rust toolchain (install from [rustup.rs](https://rustup.rs))
 
 ```bash
-cd rust/llphyscore
+# Download this repo
+git clone https://github.com/alex-tianhuang/llphy_rust.git
+cd llphy_rust/rust/llphyscore
+
+# Build using cargo
 cargo build --release
 ```
 
