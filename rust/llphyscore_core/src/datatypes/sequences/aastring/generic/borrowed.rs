@@ -27,6 +27,18 @@ impl<A: AALike> aa_str<A> {
         //         this function is safe to use.
         unsafe { &*ptr }
     }
+    /// Try and convert the slice of bytes to an [`aa_str`].
+    ///
+    /// Fails if any of the bytes in the slice are non-`A` bytes.
+    pub fn from_bytes(slice: &[u8]) -> Result<&Self, Error> {
+        for &b in slice.iter() {
+            let ch = b as char;
+            if A::try_from(ch).is_err() {
+                return Err(Error::msg(format!("expected uppercase aminoacid character, found `{}`", ch)))
+            }
+        }
+        Ok(unsafe { aa_str::from_bytes_unchecked(slice) })
+    }
     /// Parse an [`aa_str`] from the given slice of bytes,
     /// which may represent a sequence over multiple lines.
     ///
