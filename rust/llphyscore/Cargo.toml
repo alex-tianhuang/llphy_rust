@@ -9,3 +9,6 @@ bumpalo = { version = "3.20.2", features = ["boxed", "collections"] }
 clap = { version = "4.5.60", features = ["derive"] }
 csv = "1.4.0"
 llphyscore_core = { path = "../llphyscore_core" }
+
+[features]
+simd = ["llphyscore_core/simd"]
