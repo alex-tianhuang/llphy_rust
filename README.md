@@ -76,11 +76,22 @@ results = calc.calculate(sequences, score_type="z-score", disable_pbar=True)
 git clone https://github.com/alex-tianhuang/llphy_rust.git
 cd llphy_rust/rust/llphyscore
 
-# Build using cargo
+# Build using cargo, compiled executable at `../target/release/llphyscore`
 cargo build --release
+```
 
-# Use as `llphyscore` on the command line
-alias llphyscore=$(realpath ../target/release/llphyscore)
+### Making `llphyscore` accessible system-wide (recommended)
+
+If you use conda or mamba, you can copy the compiled executable directly into your active environment's `bin/` directory — no PATH changes needed, and uninstalling is as simple as removing the file:
+
+```bash
+# Activate the environment you want to install into, then:
+cp ../target/release/llphyscore $CONDA_PREFIX/bin/llphyscore
+```
+
+To uninstall:
+```bash
+rm $CONDA_PREFIX/bin/llphyscore
 ```
 
 ### Usage
