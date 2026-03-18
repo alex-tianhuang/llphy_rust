@@ -37,8 +37,10 @@ cd llphy_rust/rust/llphyscore_pylib
 pip install maturin
 
 # Build and install the Python package
-maturin build --release
-pip install ../../target/wheels/llphyscore-*.whl
+maturin develop --release
+
+# Use in python
+python
 ```
 
 ### Usage
@@ -76,9 +78,10 @@ cd llphy_rust/rust/llphyscore
 
 # Build using cargo
 cargo build --release
-```
 
-The compiled binary will be at `target/release/llphyscore`.
+# Use as `llphyscore` on the command line
+alias llphyscore=$(realpath ../target/release/llphyscore)
+```
 
 ### Usage
 
