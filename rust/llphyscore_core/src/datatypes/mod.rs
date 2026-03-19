@@ -12,5 +12,5 @@ pub use llphy::{
     GridScore, GridScorer, MAX_XMER, ModelTrainingBase, PAIR_NAMES_AND_FEATURE_NAMES, PairFreqDB,
     PairFreqDBEntry, PostProcessedFeatureMatrix, PostProcessedFeatureVector, PostProcessor,
     ReferenceFeatureMatrix, ScoreType, Thresholds, XmerIndexableArray, XmerSize, ZGridDB,
-    ZGridDBEntry, ZGridSubtable,
+    ZGridDBEntry, ZGridSubtable, GridScoringBuffer
 };
