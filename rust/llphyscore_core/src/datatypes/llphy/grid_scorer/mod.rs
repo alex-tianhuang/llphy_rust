@@ -1,7 +1,7 @@
 //! Module defining [`GridScorer`] and [`GridScore`].
 //!
 //! Structs that turn a sequence into a residue-level feature grids.
-use crate::datatypes::{AAIndex, AAMap, MAX_XMER};
+use crate::datatypes::{AAIndex, AAMap, Aminoacid, MAX_XMER, aa_canonical_str};
 use anyhow::Error;
 pub use avg_sdev_db::AvgSdevDB;
 use borsh::BorshSerialize;
@@ -41,6 +41,13 @@ pub struct GridScorer<'a> {
     pub avg_sdevs: AvgSdevDB,
     pub z_grid: ZGridDB<'a>,
 }
+/// A helper struct for [`GridScorer::score_sequence`]
+/// to reuse memory.
+pub struct GridScoringBuffer<'a> {
+    sequence_buffer: Vec<'a, AAIndex>,
+    sequence_transposed_buffer: AAMap<Vec<'a, usize>>,
+    grid_score_buffer: AAMap<[Vec<'a, f64>; 2]>,
+}
 /// A collection of biophysical feature scores for
 /// each residue in a sequence.
 pub struct GridScore<'a> {
@@ -79,32 +86,38 @@ impl<'a> GridScorer<'a> {
     /// Turn a sequence into a biophysical feature grid (currently [`GridScore`])
     /// by looking at the average value of some given biophysical feature on windows
     /// centered on each residue type.
-    pub fn score_sequence<'b>(&self, sequence: &[AAIndex], arena: &'b Bump) -> GridScore<'b> {
+    pub fn score_sequence<'b>(&self, sequence: &aa_canonical_str, buffer: &'b mut GridScoringBuffer<'_>) -> GridScore<'b> {
         let Some(n_sites) = sequence.len().checked_sub(2) else {
             return GridScore {
                 feature_a_scores: AAMap([&[]; 20]),
                 feature_b_scores: AAMap([&[]; 20]),
             };
         };
-        let mut site_counts = AAMap::default();
+        buffer.sequence_buffer.clear();
+        buffer.sequence_buffer.extend(sequence.into_iter().map(Aminoacid::to_aaindex));
+        let sequence = &*buffer.sequence_buffer;
+        let mut site_counts = <AAMap<usize>>::default();
         for &aa in &sequence[1..=n_sites] {
             site_counts[aa] += 1;
         }
-        let mut site_indexes = AAMap(std::array::from_fn(|aaindex| {
-            let cap = site_counts.0[aaindex];
-            Vec::with_capacity_in(cap, arena)
-        }));
+        let site_indexes = &mut buffer.sequence_transposed_buffer;
+        for (buffer, cap) in site_indexes.0.iter_mut().zip(site_counts.0) {
+            buffer.clear();
+            buffer.reserve(cap);
+        }
         for (i, &aa_i) in sequence[1..=n_sites].iter().enumerate() {
             site_indexes[aa_i].push(i + 1);
         }
         let mut feature_a_scores = AAMap::<&[f64]>([&[]; 20]);
         let mut feature_b_scores = AAMap::<&[f64]>([&[]; 20]);
-        for (aa_i, sites_containing_aa_i) in site_indexes.0.into_iter().enumerate() {
+        for (aa_i, ([feature_a_scores_i, feature_b_scores_i], sites_containing_aa_i)) in buffer.grid_score_buffer.0.iter_mut().zip(site_indexes.0.iter_mut()).enumerate() {
             let aa_i = unsafe { AAIndex::from_byte_unchecked(aa_i as u8) };
             let n_sites_i = sites_containing_aa_i.len();
-            let feature_a_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
-            let feature_b_scores_i = arena.alloc_slice_fill_copy(n_sites_i, f64::NAN);
-            for (i, &site) in sites_containing_aa_i.iter().enumerate() {
+            feature_a_scores_i.clear();
+            feature_a_scores_i.reserve(n_sites_i);
+            feature_b_scores_i.clear();
+            feature_b_scores_i.reserve(n_sites_i);
+            for &site in sites_containing_aa_i.iter() {
                 let wingspan = wingspan_of(site, sequence.len());
                 let mut outer_accumulator = ZGridEntrySum::new_zeroed();
                 let mut inner_accumulator = PairFreqEntrySum::new_zeroed();
@@ -122,17 +135,22 @@ impl<'a> GridScorer<'a> {
                     outer_accumulator += self.z_grid[aa_i][xmer].lookup(zscores);
                 }
                 let [freq_a, freq_b] = outer_accumulator.as_frequencies();
-                feature_a_scores_i[i] = freq_a;
-                feature_b_scores_i[i] = freq_b;
+                feature_a_scores_i.push(freq_a);
+                feature_b_scores_i.push(freq_b);
             }
             feature_a_scores[aa_i] = feature_a_scores_i;
             feature_b_scores[aa_i] = feature_b_scores_i;
-            std::mem::forget(sites_containing_aa_i);
         }
         GridScore {
             feature_a_scores,
             feature_b_scores,
         }
+    }
+}
+impl<'a> GridScoringBuffer<'a> {
+    /// Make a new [`GridScoringBuffer`].
+    pub fn new(arena: &'a Bump) -> Self {
+        Self { sequence_buffer: Vec::new_in(arena), sequence_transposed_buffer: AAMap(std::array::from_fn(|_| Vec::new_in(arena))), grid_score_buffer: AAMap(std::array::from_fn(|_| [Vec::new_in(arena), Vec::new_in(arena)])) }
     }
 }
 

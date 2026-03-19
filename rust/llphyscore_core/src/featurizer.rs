@@ -13,13 +13,14 @@
 
 use crate::{
     datatypes::{
-        Aminoacid, FEATURE_NAMES, FeatureMatrix, GridDecoderPair, ModelTrainingBase, aa_canonical_str,
+        FEATURE_NAMES, FeatureMatrix, GridDecoderPair, GridScoringBuffer, ModelTrainingBase,
+        aa_canonical_str,
     },
     load_pkg_data::{load_grid_decoders, load_grid_scorer},
     utils::{lookup_by_pair, lookup_f2p, lookup_findex},
 };
 use anyhow::Error;
-use bumpalo::{Bump, collections::Vec};
+use bumpalo::Bump;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use std::fmt::Write;
 use std::path::Path;
@@ -69,7 +70,7 @@ impl<'a> Featurizer<'a> {
         self
     }
     /// Check for interruption signals while running [`Self::featurize`].
-    /// 
+    ///
     /// Currently only used to check for KeyboardInterrupts from python.
     pub fn with_interrupter(mut self, interrupter: &'a dyn Fn() -> Result<(), Error>) -> Self {
         self.interrupter = Some(interrupter);
@@ -84,12 +85,6 @@ impl<'a> Featurizer<'a> {
     ) -> Result<FeatureMatrix<'b, i64>, Error> {
         let num_features = FEATURE_NAMES.len();
         let num_sequences = sequences.len();
-        let Some(max_seq_len) = sequences.clone().map(|seq| seq.len()).max() else {
-            return Ok(FeatureMatrix {
-                feature_names: &FEATURE_NAMES,
-                data: &mut [],
-            });
-        };
         let row_size = num_features + 1;
         const UNINIT_SENTINEL: i64 = i64::MIN;
         let data = arena.alloc_slice_fill_copy(num_sequences * row_size, UNINIT_SENTINEL);
@@ -106,8 +101,8 @@ impl<'a> Featurizer<'a> {
                 Error::msg(format!("unknown/unsupported feature name {}", feature_name))
             })?;
             let [feature_idx_a, feature_idx_b] = feature_names_for_pair.map(lookup_findex);
-            let mut sequence_buffer = Vec::with_capacity_in(max_seq_len, &temp_arena);
             let grid_scorer = load_grid_scorer(self.pkg_data_root, pair_name, &temp_arena)?;
+            let mut grid_scoring_buffer = GridScoringBuffer::new(arena);
             let pbar = self.with_pbar.then(|| pbar(sequences.len()));
             pbar.as_ref().map(|pbar| {
                 pbar.println(
@@ -116,9 +111,7 @@ impl<'a> Featurizer<'a> {
             });
             for (j, seq) in sequences.clone().enumerate() {
                 self.interrupter.map(|f| f()).unwrap_or(Ok(()))?;
-                sequence_buffer.clear();
-                sequence_buffer.extend(seq.into_iter().map(Aminoacid::to_aaindex));
-                let scored = grid_scorer.score_sequence(&sequence_buffer, &temp_arena);
+                let scored = grid_scorer.score_sequence(seq, &mut grid_scoring_buffer);
                 if let Some(slot) = feature_idx_a {
                     let slot = j * row_size + slot;
                     let value = decoder_pair.decoder_a.decode(&scored.feature_a_scores);

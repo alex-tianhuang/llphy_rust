@@ -11,7 +11,7 @@ pub use features::{
 pub use grid_decoder::{GridDecoder, GridDecoderPair, Thresholds};
 pub use grid_scorer::{
     AvgSdevDB, AvgSdevDBEntry, GridScore, GridScorer, PairFreqDB, PairFreqDBEntry,
-    XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable,
+    XmerIndexableArray, XmerSize, ZGridDB, ZGridDBEntry, ZGridSubtable, GridScoringBuffer
 };
 pub use model_train_base::ModelTrainingBase;
 pub use post_processor::{PostProcessor, ScoreType};
