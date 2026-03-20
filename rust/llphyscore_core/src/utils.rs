@@ -123,7 +123,7 @@ pub fn read_file<'a>(path: &Path, arena: &'a Bump) -> Result<Vec<'a, u8>, Error>
         // on reading the contents of the buf that was passed in.
         // So here are some spooky uninitialized bytes!
         let mut spare =
-            unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.capacity() - buf.len()) };
+            unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(buf.len()), buf.capacity() - buf.len()) };
         let buf_len = std::cmp::min(spare.len(), max_read_size);
         spare = &mut spare[..buf_len];
         let bytes_read = file.read(spare)?;
