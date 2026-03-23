@@ -102,7 +102,7 @@ impl<'a> Featurizer<'a> {
             })?;
             let [feature_idx_a, feature_idx_b] = feature_names_for_pair.map(lookup_findex);
             let grid_scorer = load_grid_scorer(self.pkg_data_root, pair_name, &temp_arena)?;
-            let mut grid_scoring_buffer = GridScoringBuffer::new(arena);
+            let mut grid_scoring_buffer = GridScoringBuffer::new(&temp_arena);
             let pbar = self.with_pbar.then(|| pbar(sequences.len()));
             pbar.as_ref().map(|pbar| {
                 pbar.println(
