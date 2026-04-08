@@ -1,11 +1,11 @@
 //! Module defining [`LLPhyScoreCalculator`]
 //! and its main method [`LLPhyScoreCalculator::calculate`].
-use crate::{PKG_DATA_ROOT, utils::load_grid_decoders_static};
+use crate::{PKG_DATA_ROOT, utils::{load_grid_decoders_static, serialize_row}};
 use anyhow::Error;
 use bumpalo::{Bump, collections::Vec};
 use llphyscore_core::{
     datatypes::{
-        GridDecoderPair, ModelTrainingBase, PostProcessedFeatureMatrix, PostProcessedFeatureVector,
+        GridDecoderPair, ModelTrainingBase, PostProcessedFeatureMatrix,
         ScoreType, aa_canonical_str,
     },
     featurizer::Featurizer,
@@ -216,34 +216,6 @@ impl<'a, 'py> CalculatorInput<'a, 'py> {
                 let dict = PyDict::from_sequence(&items.into_sequence().into_any())?;
                 Ok(dict.into_any())
             }
-        }
-    }
-}
-/// Turns a row of numbers + feature names
-/// into a dictionary of {feat_name, feat_value} pairs.
-/// 
-/// Helper for [`CalculatorInput::serialize`].
-fn serialize_row<'py>(
-    row: PostProcessedFeatureVector,
-    feature_names: &[Bound<PyString>],
-    py: Python<'py>,
-) -> PyResult<Bound<'py, PyDict>> {
-    match row {
-        PostProcessedFeatureVector::Raw(data) => {
-            debug_assert_eq!(feature_names.len(), data.len());
-            let output_row = PyDict::new(py);
-            for (feat_name, value) in feature_names.iter().zip(data) {
-                output_row.set_item(feat_name, value)?;
-            }
-            Ok(output_row)
-        }
-        PostProcessedFeatureVector::Processed(data) => {
-            debug_assert_eq!(feature_names.len(), data.len());
-            let output_row = PyDict::new(py);
-            for (feat_name, value) in feature_names.iter().zip(data) {
-                output_row.set_item(feat_name, value)?;
-            }
-            Ok(output_row)
         }
     }
 }
