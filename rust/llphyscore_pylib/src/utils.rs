@@ -1,10 +1,10 @@
 use crate::PKG_DATA_ROOT;
 use bumpalo::Bump;
 use llphyscore_core::{
-    datatypes::{GridDecoderPair, ModelTrainingBase},
+    datatypes::{GridDecoderPair, ModelTrainingBase, PostProcessedFeatureVector},
     load_pkg_data::load_grid_decoders,
 };
-use pyo3::{PyResult, Python};
+use pyo3::{Bound, PyResult, Python, types::{PyDict, PyDictMethods, PyString}};
 use std::path::Path;
 /// Helper macro for defining a static struct
 /// from something that is constructed using an arena.
@@ -73,4 +73,33 @@ pub fn load_grid_decoders_static(
         };
     }
     impl_branches!(model_training_base, Human, HumanPDB, PDB)
+}
+
+/// Turns a row of numbers + feature names
+/// into a dictionary of {feat_name, feat_value} pairs.
+/// 
+/// Fails if and only if `dict.__setitem__` fails, so typically does not fail.
+pub fn serialize_row<'py>(
+    row: PostProcessedFeatureVector,
+    feature_names: &[Bound<PyString>],
+    py: Python<'py>,
+) -> PyResult<Bound<'py, PyDict>> {
+    match row {
+        PostProcessedFeatureVector::Raw(data) => {
+            debug_assert_eq!(feature_names.len(), data.len());
+            let output_row = PyDict::new(py);
+            for (feat_name, value) in feature_names.iter().zip(data) {
+                output_row.set_item(feat_name, value)?;
+            }
+            Ok(output_row)
+        }
+        PostProcessedFeatureVector::Processed(data) => {
+            debug_assert_eq!(feature_names.len(), data.len());
+            let output_row = PyDict::new(py);
+            for (feat_name, value) in feature_names.iter().zip(data) {
+                output_row.set_item(feat_name, value)?;
+            }
+            Ok(output_row)
+        }
+    }
 }
